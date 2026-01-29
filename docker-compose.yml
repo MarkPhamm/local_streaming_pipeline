@@ -1,0 +1,68 @@
+services:
+  # Define a service called "kafka"
+  kafka:
+    # Use official Apache Kafka image
+    image: apache/kafka:3.7.0
+
+    # Name the container "kafka" (easier to reference in logs/commands)
+    container_name: kafka
+
+    # Map port 9092 from container to host
+    # Format: "HOST_PORT:CONTAINER_PORT"
+    # This lets your Python producer connect to localhost:9092
+    ports:
+      - "9092:9092"
+
+    environment:
+      # ============================================
+      # KRaft Mode Configuration (Kafka without Zookeeper)
+      # ============================================
+      # Before Kafka 3.x, you needed Zookeeper to manage cluster metadata.
+      # KRaft (Kafka Raft) lets Kafka manage itself - simpler setup!
+
+      # Unique ID for this Kafka node (we only have 1 node, so it's 0)
+      KAFKA_NODE_ID: 1
+
+      # This node acts as BOTH controller AND broker:
+      # - Controller: manages cluster metadata (who's leader, partitions, etc.)
+      # - Broker: actually stores and serves messages
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # List of controller nodes that vote on cluster decisions
+      # Format: NODE_ID@HOST:PORT
+      # Only 1 controller (node 1) on internal port 9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+
+      # ============================================
+      # Listener Configuration (how clients connect)
+      # ============================================
+      # Listeners = network interfaces Kafka binds to
+      # - PLAINTEXT://:9092 = broker listens on port 9092 (for producers/consumers)
+      # - CONTROLLER://:9093 = internal port for controller communication
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+
+      # What address to tell clients to connect to
+      # Since we're running locally, clients connect to localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # Security protocol for each listener (PLAINTEXT = no encryption)
+      # In production, you'd use SSL or SASL_SSL
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+      # Which listener the controller uses (internal communication)
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Which listener handles inter-broker communication
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # ============================================
+      # Topic Configuration
+      # ============================================
+      # Replication factor for offset topic (1 for single node)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Replication factor for transaction state topic
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      # Minimum in-sync replicas for transaction state topic
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
