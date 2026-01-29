@@ -360,3 +360,58 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh \
   --delete \
   --topic stock-ticks
 ```
+
+## Console Consumer (Read Messages)
+
+Use the console consumer to verify messages are being received.
+
+```text
+Terminal 1 (producer)          Terminal 2 (consumer)
+
+python producer.py             kafka-console-consumer.sh
+    │                              │
+    │  sends messages              │  reads messages
+    ▼                              ▼
++─────────────────────────────────────+
+│            Kafka                    │
+│         [stock-ticks]               │
+│  msg1, msg2, msg3, msg4 ...         │
++─────────────────────────────────────+
+```
+
+### From Outside the Container
+
+```bash
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic stock-ticks \
+  --from-beginning
+```
+
+### From Inside the Container
+
+If you're already attached to the Kafka container:
+
+```bash
+/opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic stock-ticks \
+  --from-beginning
+```
+
+### Command Breakdown
+
+| Part | Meaning |
+| ---- | ------- |
+| `kafka-console-consumer.sh` | Built-in script to read messages |
+| `--bootstrap-server localhost:9092` | Where Kafka is running |
+| `--topic stock-ticks` | Which topic to read from |
+| `--from-beginning` | Start from the first message (not just new ones) |
+
+### Other Useful Flags
+
+| Flag | Meaning |
+| ---- | ------- |
+| `--from-beginning` | Read all messages from start |
+| (no flag) | Only read NEW messages arriving after you start |
+| `--max-messages 10` | Stop after reading 10 messages |
