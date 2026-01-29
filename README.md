@@ -1,2 +1,3 @@
-# local_streaming_pipeline
+# Local Streaming Pipeline
+
 Streaming pipeline with Kafka, Spark streaming, Clickhouse, and Metabase
