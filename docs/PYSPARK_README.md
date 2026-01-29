@@ -304,3 +304,64 @@ When writing stream results, you choose an output mode:
 | `update` | Only output changed rows |
 
 For just consuming and printing, use `append`.
+
+## Running the Consumer with spark-submit
+
+### The Command
+
+```bash
+/opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /app/src/consumer/spark_consumer.py
+```
+
+### Breaking It Down
+
+```text
+/opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /app/src/consumer/spark_consumer.py
+|__________________________|  |______|  |______________________________________________|  |__________________________________|
+            |                    |                          |                                           |
+      Spark's tool           Flag                   Kafka connector                            Your Python script
+      to run apps                                   (Maven coordinates)                        (path inside container)
+```
+
+| Part | Meaning |
+| ---- | ------- |
+| `/opt/spark/bin/spark-submit` | Spark's CLI tool to run applications |
+| `--packages` | Flag to download dependencies from Maven |
+| `org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0` | Kafka connector JAR (auto-downloaded) |
+| `/app/src/consumer/spark_consumer.py` | Path to your script inside the container |
+
+### Why spark-submit?
+
+You can't just run `python spark_consumer.py` because:
+
+1. **Spark needs setup** - spark-submit configures the Spark environment
+2. **Dependencies** - it downloads the Kafka connector JAR
+3. **Cluster mode** - in production, it distributes work to workers
+
+```text
+python script.py          --> Just runs Python
+spark-submit script.py    --> Sets up Spark, then runs Python with Spark context
+```
+
+### Why --packages?
+
+The `--packages` flag tells Spark to:
+
+1. Look up the package in Maven Central (like npm for Java)
+2. Download the JAR file
+3. Add it to the classpath
+
+Without it, Spark wouldn't know how to talk to Kafka.
+
+### Path Explanation
+
+```text
+Your machine:           /Users/you/project/src/consumer/spark_consumer.py
+                                    |
+                        mounted as volume in docker-compose.yml
+                                    |
+                                    v
+Inside container:       /app/src/consumer/spark_consumer.py
+```
+
+The `-./:/app` volume mount maps your project folder to `/app` in the container.

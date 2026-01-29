@@ -61,11 +61,18 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh \
 
 ```text
 local_streaming_pipeline/
-├── docker-compose.yml    # Kafka setup
-├── requirements.txt      # Python dependencies
+├── docker-compose.yml       # Kafka + Spark setup
+├── requirements.txt         # Python dependencies
+├── pyproject.toml           # Project config + linting rules
+├── src/
+│   ├── producer/
+│   │   └── producer.py      # Sends stock ticks to Kafka
+│   └── consumer/
+│       └── spark_consumer.py # Reads from Kafka with Spark
 ├── docs/
-│   └── KAFKA_README.md   # Kafka deep-dive documentation
-└── README.md             # This file
+│   ├── KAFKA_README.md      # Kafka deep-dive documentation
+│   └── PYSPARK_README.md    # PySpark deep-dive documentation
+└── README.md                # This file
 ```
 
 ## Documentation
