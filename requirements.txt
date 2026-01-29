@@ -1,0 +1,2 @@
+# Kafka client for Python (maintained fork, works with Python 3.12+)
+kafka-python-ng==2.2.2
