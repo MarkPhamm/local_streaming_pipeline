@@ -1,0 +1,50 @@
+[project]
+name = "local-streaming-pipeline"
+version = "0.1.0"
+description = "A simple local streaming pipeline for learning"
+requires-python = ">=3.10"
+
+# =============================================================================
+# RUFF - Fast Python Linter & Formatter
+# =============================================================================
+[tool.ruff]
+# Which Python version to target
+target-version = "py310"
+
+# Max line length
+line-length = 88
+
+# Files/folders to ignore
+exclude = [
+    ".venv",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# Rules to enable
+# See all rules: https://docs.astral.sh/ruff/rules/
+select = [
+    "E",      # pycodestyle errors (basic Python style)
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes (unused imports, undefined variables)
+    "I",      # isort (import sorting)
+    "B",      # flake8-bugbear (common bugs)
+    "C4",     # flake8-comprehensions (better list/dict comprehensions)
+    "UP",     # pyupgrade (use modern Python syntax)
+]
+
+# Rules to ignore
+ignore = [
+    "E501",   # line too long (let formatter handle it)
+]
+
+[tool.ruff.lint.isort]
+# Put imports in this order: standard library, third-party, local
+known-first-party = ["producer"]
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Indent with spaces
+indent-style = "space"
