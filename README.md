@@ -67,8 +67,11 @@ local_streaming_pipeline/
 ├── src/
 │   ├── producer/
 │   │   └── producer.py      # Sends stock ticks to Kafka
-│   └── consumer/
-│       └── spark_consumer.py # Reads from Kafka with Spark
+│   ├── consumer/
+│   │   ├── spark_consumer.py            # Reads from Kafka, prints to console
+│   │   └── spark_clickhouse_consumer.py # Reads from Kafka, writes to ClickHouse
+│   └── dashboard/
+│       └── app.py                       # Streamlit dashboard
 ├── docs/
 │   ├── KAFKA_README.md      # Kafka deep-dive documentation
 │   ├── PYSPARK_README.md    # PySpark deep-dive documentation
@@ -84,20 +87,47 @@ local_streaming_pipeline/
 docker-compose up -d
 ```
 
-### 2. Run the Producer (from your machine)
+Verify all containers are running:
 
 ```bash
-python src/producer/producer.py
+docker ps
 ```
 
-### 3. Run the Spark Consumer (inside Spark container)
+You should see:
+
+```text
+NAMES        IMAGE                              STATUS
+kafka        apache/kafka:3.7.0                 Up
+spark        apache/spark:3.5.0                 Up
+clickhouse   clickhouse/clickhouse-server:24.1  Up
+```
+
+### 2. Run the Pipeline (4 Terminals)
+
+| Terminal | What | Command |
+|----------|------|---------|
+| 1 | Producer | `python src/producer/producer.py` |
+| 2 | Console consumer | See below |
+| 3 | ClickHouse consumer | See below |
+| 4 | Query ClickHouse | `docker exec -it clickhouse clickhouse-client` |
+
+**Terminal 2 - Console consumer:**
 
 ```bash
-docker exec -it spark bash
-/opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /app/src/consumer/spark_consumer.py
+docker exec -it spark /opt/spark/bin/spark-submit \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+  /app/src/consumer/spark_consumer.py
 ```
 
-### 4. Query ClickHouse (inside ClickHouse container)
+**Terminal 3 - ClickHouse consumer:**
+
+```bash
+docker exec -it spark /opt/spark/bin/spark-submit \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.6.0,org.apache.httpcomponents.client5:httpclient5:5.3.1 \
+  /app/src/consumer/spark_clickhouse_consumer.py
+```
+
+**Terminal 4 - Query ClickHouse:**
 
 ```bash
 docker exec -it clickhouse clickhouse-client
@@ -106,6 +136,37 @@ docker exec -it clickhouse clickhouse-client
 ```sql
 SELECT * FROM stocks.ticks ORDER BY timestamp DESC LIMIT 10;
 ```
+
+### Flow Diagram
+
+```text
+docker-compose up -d
+        |
+        v
++-------+-------+------------+
+|       |       |            |
+v       v       v            v
+Kafka  Spark  ClickHouse   (all running)
+
+Then:
+
+                      +-> spark_consumer.py -----------> Console (print)
+                      |
+Producer -> Kafka ----+
+                      |
+                      +-> spark_clickhouse_consumer.py -> ClickHouse (store)
+                                                              |
+                                                              v
+                                                         Streamlit Dashboard
+```
+
+### 5. Run the Dashboard (from your machine)
+
+```bash
+streamlit run src/dashboard/app.py
+```
+
+Opens at <http://localhost:8501>
 
 ## Documentation
 
