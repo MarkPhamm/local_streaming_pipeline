@@ -61,7 +61,7 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh \
 
 ```text
 local_streaming_pipeline/
-├── docker-compose.yml       # Kafka + Spark setup
+├── docker-compose.yml       # Kafka + Spark + ClickHouse setup
 ├── requirements.txt         # Python dependencies
 ├── pyproject.toml           # Project config + linting rules
 ├── src/
@@ -71,10 +71,46 @@ local_streaming_pipeline/
 │       └── spark_consumer.py # Reads from Kafka with Spark
 ├── docs/
 │   ├── KAFKA_README.md      # Kafka deep-dive documentation
-│   └── PYSPARK_README.md    # PySpark deep-dive documentation
+│   ├── PYSPARK_README.md    # PySpark deep-dive documentation
+│   └── CLICKHOUSE_README.md # ClickHouse deep-dive documentation
 └── README.md                # This file
+```
+
+## Running the Pipeline
+
+### 1. Start All Services
+
+```bash
+docker-compose up -d
+```
+
+### 2. Run the Producer (from your machine)
+
+```bash
+python src/producer/producer.py
+```
+
+### 3. Run the Spark Consumer (inside Spark container)
+
+```bash
+docker exec -it spark bash
+/opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /app/src/consumer/spark_consumer.py
+```
+
+### 4. Query ClickHouse (inside ClickHouse container)
+
+```bash
+docker exec -it clickhouse clickhouse-client
+```
+
+```sql
+SELECT * FROM stocks.ticks ORDER BY timestamp DESC LIMIT 10;
 ```
 
 ## Documentation
 
-- [Kafka Deep Dive](docs/KAFKA_README.md) - Detailed Kafka concepts and commands
+| Topic | Description |
+| ----- | ----------- |
+| [Kafka](docs/KAFKA_README.md) | Message broker concepts, topics, partitions, commands |
+| [PySpark](docs/PYSPARK_README.md) | Structured Streaming, Kafka integration, spark-submit |
+| [ClickHouse](docs/CLICKHOUSE_README.md) | Column storage, MergeTree engine, SQL queries |
