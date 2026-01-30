@@ -98,3 +98,44 @@ services:
     # Keep container running so we can exec into it
     # (We'll manually run spark_consumer.py)
     command: sleep infinity
+
+  # =============================================================================
+  # CLICKHOUSE - Analytics Database
+  # =============================================================================
+  clickhouse:
+    # Official ClickHouse image
+    image: clickhouse/clickhouse-server:24.1
+
+    # Name the container
+    container_name: clickhouse
+
+    # Expose ports
+    ports:
+      - "8123:8123"    # HTTP interface (for queries via curl/browser)
+      - "9000:9000"    # Native TCP interface (for clients/drivers)
+
+    # Store data persistently (survives container restarts)
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+    environment:
+      # ============================================
+      # ClickHouse Configuration
+      # ============================================
+      # Default user (for learning - in production use proper auth)
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+
+    # Healthcheck to know when ClickHouse is ready
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# =============================================================================
+# VOLUMES - Persistent Storage
+# =============================================================================
+volumes:
+  clickhouse_data:    # Named volume for ClickHouse data
