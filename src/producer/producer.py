@@ -25,14 +25,17 @@ KAFKA_TOPIC = "stock-ticks"
 # Stocks we'll generate prices for
 STOCKS = ["AAPL", "GOOGL", "MSFT", "AMZN", "META"]
 
-# Starting prices for each stock (we'll fluctuate around these)
-BASE_PRICES = {
+# Current prices for each stock (will change over time)
+current_prices = {
     "AAPL": 150.00,
     "GOOGL": 140.00,
     "MSFT": 380.00,
     "AMZN": 175.00,
     "META": 500.00,
 }
+
+# How volatile each tick can be (-10% to +10%)
+VOLATILITY = 0.50
 
 # =============================================================================
 # CREATE THE PRODUCER
@@ -52,25 +55,26 @@ producer = KafkaProducer(
 # =============================================================================
 def generate_stock_tick():
     """
-    Generate a single fake stock tick.
+    Generate a single fake stock tick with volatile price movement.
 
-    Returns a dict like:
-    {
-        "symbol": "AAPL",
-        "price": 150.25,
-        "volume": 1523,
-        "timestamp": "2026-01-29T10:30:00.123456"
-    }
+    Uses a "random walk" - each price changes from the PREVIOUS price,
+    creating realistic-looking volatile movements.
     """
     # Pick a random stock
     symbol = random.choice(STOCKS)
 
-    # Get base price and add some random fluctuation (-2% to +2%)
-    base_price = BASE_PRICES[symbol]
-    fluctuation = random.uniform(-0.02, 0.02)  # -2% to +2%
-    price = round(base_price * (1 + fluctuation), 2)
+    # Get current price and apply random fluctuation (random walk)
+    old_price = current_prices[symbol]
+    fluctuation = random.uniform(-VOLATILITY, VOLATILITY)
+    new_price = round(old_price * (1 + fluctuation), 2)
 
-    # Random volume (number of shares traded)
+    # Prevent price from going negative or too low
+    new_price = max(new_price, 1.0)
+
+    # Update the current price for next time (random walk)
+    current_prices[symbol] = new_price
+
+    # Random volume
     volume = random.randint(100, 10000)
 
     # Current timestamp
@@ -78,7 +82,7 @@ def generate_stock_tick():
 
     return {
         "symbol": symbol,
-        "price": price,
+        "price": new_price,
         "volume": volume,
         "timestamp": timestamp,
     }
