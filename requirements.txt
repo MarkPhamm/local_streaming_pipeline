@@ -2,8 +2,14 @@
 kafka-python-ng==2.2.2
 # Linting & Formatting
 ruff==0.4.4
-# Dashboard
+# Dashboard - Streamlit
 streamlit==1.41.1
 streamlit-autorefresh==1.0.1
+# Dashboard - Web (FastAPI)
+fastapi==0.115.0
+uvicorn==0.32.0
 # ClickHouse Python client
 clickhouse-connect==0.8.9
+# Flink Python API (requires Java 11, supports Python 3.12)
+setuptools  # Provides distutils for pemja build
+apache-flink==1.20.0
