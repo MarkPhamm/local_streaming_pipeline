@@ -1,5 +1,7 @@
 # Kafka client for Python (maintained fork, works with Python 3.12+)
 kafka-python-ng==2.2.2
+# WebSocket client for real-time data streams
+websocket-client==1.8.0
 # Linting & Formatting
 ruff==0.4.4
 # Dashboard - Streamlit
