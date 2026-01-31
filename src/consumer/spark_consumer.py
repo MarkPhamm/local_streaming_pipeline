@@ -11,8 +11,8 @@ from pyspark.sql import SparkSession
 # CONFIGURATION
 # =============================================================================
 
-# Kafka connection (from inside Docker, use kafka:29092)
-KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
+# Kafka connection (localhost when running on host machine)
+KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 
 # Topic to read from
 KAFKA_TOPIC = "stock-ticks"

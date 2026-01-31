@@ -20,12 +20,12 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, L
 # CONFIGURATION
 # =============================================================================
 
-# Kafka connection (from inside Docker, use kafka:29092)
-KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
+# Kafka connection (localhost when running on host machine)
+KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 KAFKA_TOPIC = "stock-ticks"
 
-# ClickHouse connection (from inside Docker, use clickhouse:8123)
-CLICKHOUSE_HOST = "clickhouse"
+# ClickHouse connection (localhost when running on host machine)
+CLICKHOUSE_HOST = "localhost"
 CLICKHOUSE_PORT = "8123"
 CLICKHOUSE_DATABASE = "stocks"
 CLICKHOUSE_TABLE = "ticks"
@@ -124,10 +124,12 @@ df_parsed = (
 CLICKHOUSE_JDBC_URL = f"jdbc:clickhouse://{CLICKHOUSE_HOST}:{CLICKHOUSE_PORT}/{CLICKHOUSE_DATABASE}"
 
 # JDBC connection properties
+# isolationLevel=NONE disables transaction isolation (ClickHouse doesn't support transactions)
 CLICKHOUSE_PROPERTIES = {
     "driver": "com.clickhouse.jdbc.ClickHouseDriver",
     "user": "default",
     "password": "",
+    "isolationLevel": "NONE",
 }
 
 
