@@ -285,7 +285,23 @@
         let priceChart = null;
         let volumeChart = null;
         let refreshTimer = null;
-        const colors = ['#4a9eff', '#00d26a', '#ff4444', '#ffd700', '#9b59b6', '#e91e63'];
+
+        // Fixed color mapping for each symbol (consistent colors)
+        const symbolColors = {
+            'AAPL': '#4a9eff',   // Blue
+            'GOOGL': '#00d26a',  // Green
+            'MSFT': '#9b59b6',   // Purple
+            'AMZN': '#ffd700',   // Gold
+            'META': '#ff4444',   // Red
+            'TSLA': '#e91e63',   // Pink
+            'NVDA': '#00bcd4',   // Cyan
+            'NFLX': '#ff9800',   // Orange
+        };
+        const defaultColors = ['#4a9eff', '#00d26a', '#ff4444', '#ffd700', '#9b59b6', '#e91e63', '#00bcd4', '#ff9800'];
+
+        function getSymbolColor(symbol, index) {
+            return symbolColors[symbol] || defaultColors[index % defaultColors.length];
+        }
 
         // =============================================================================
         // API CALLS
@@ -315,7 +331,7 @@
             container.innerHTML = data.map((item, i) => `
                 <div class="price-card">
                     <div class="symbol">${item.symbol}</div>
-                    <div class="price" style="color: ${colors[i % colors.length]}">
+                    <div class="price" style="color: ${getSymbolColor(item.symbol, i)}">
                         $${item.price.toFixed(2)}
                     </div>
                     <div class="details">
@@ -334,18 +350,19 @@
                 return;
             }
 
-            // Group by symbol
-            const symbols = [...new Set(data.map(d => d.symbol))];
+            // Group by symbol (sort alphabetically for consistent order)
+            const symbols = [...new Set(data.map(d => d.symbol))].sort();
             const datasets = symbols.map((symbol, i) => {
                 const symbolData = data.filter(d => d.symbol === symbol);
+                const color = getSymbolColor(symbol, i);
                 return {
                     label: symbol,
                     data: symbolData.map(d => ({
                         x: new Date(d.timestamp),
                         y: d.price
                     })),
-                    borderColor: colors[i % colors.length],
-                    backgroundColor: colors[i % colors.length] + '20',
+                    borderColor: color,
+                    backgroundColor: color + '20',
                     borderWidth: 2,
                     fill: false,
                     tension: 0.1,
@@ -459,11 +476,13 @@
                 return;
             }
 
+            // Sort by symbol for consistent order
+            const sortedData = [...data].sort((a, b) => a.symbol.localeCompare(b.symbol));
             const chartData = {
-                labels: data.map(d => d.symbol),
+                labels: sortedData.map(d => d.symbol),
                 datasets: [{
-                    data: data.map(d => d.total_volume),
-                    backgroundColor: data.map((_, i) => colors[i % colors.length]),
+                    data: sortedData.map(d => d.total_volume),
+                    backgroundColor: sortedData.map((d, i) => getSymbolColor(d.symbol, i)),
                     borderWidth: 0,
                 }]
             };
