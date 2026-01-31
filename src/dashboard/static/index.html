@@ -286,21 +286,36 @@
         let volumeChart = null;
         let refreshTimer = null;
 
-        // Fixed color mapping for each symbol (consistent colors)
+        // Fixed color mapping for each symbol (consistent colors everywhere)
         const symbolColors = {
             'AAPL': '#4a9eff',   // Blue
-            'GOOGL': '#00d26a',  // Green
-            'MSFT': '#9b59b6',   // Purple
-            'AMZN': '#ffd700',   // Gold
+            'AMZN': '#00d26a',   // Green
+            'GOOGL': '#ffd700',  // Gold
             'META': '#ff4444',   // Red
+            'MSFT': '#9b59b6',   // Purple
             'TSLA': '#e91e63',   // Pink
             'NVDA': '#00bcd4',   // Cyan
             'NFLX': '#ff9800',   // Orange
         };
-        const defaultColors = ['#4a9eff', '#00d26a', '#ff4444', '#ffd700', '#9b59b6', '#e91e63', '#00bcd4', '#ff9800'];
 
-        function getSymbolColor(symbol, index) {
-            return symbolColors[symbol] || defaultColors[index % defaultColors.length];
+        function getSymbolColor(symbol) {
+            // Generate consistent color from symbol name if not predefined
+            if (symbolColors[symbol]) {
+                return symbolColors[symbol];
+            }
+            // Fallback: generate color from symbol hash
+            let hash = 0;
+            for (let i = 0; i < symbol.length; i++) {
+                hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            return `hsl(${hue}, 70%, 50%)`;
+        }
+
+        function parseTimestamp(ts) {
+            // Convert UTC timestamp from ClickHouse to local time
+            // Handle both "2024-01-31 12:00:00" and "2024-01-31T12:00:00" formats
+            return new Date(ts.replace(' ', 'T') + 'Z');
         }
 
         // =============================================================================
@@ -328,15 +343,18 @@
                 return;
             }
 
-            container.innerHTML = data.map((item, i) => `
+            // Sort alphabetically to match chart order
+            const sortedData = [...data].sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+            container.innerHTML = sortedData.map((item) => `
                 <div class="price-card">
                     <div class="symbol">${item.symbol}</div>
-                    <div class="price" style="color: ${getSymbolColor(item.symbol, i)}">
+                    <div class="price" style="color: ${getSymbolColor(item.symbol)}">
                         $${item.price.toFixed(2)}
                     </div>
                     <div class="details">
                         Volume: ${item.volume.toLocaleString()}<br>
-                        ${new Date(item.last_update).toLocaleTimeString()}
+                        ${parseTimestamp(item.last_update).toLocaleTimeString()}
                     </div>
                 </div>
             `).join('');
@@ -345,20 +363,25 @@
         function renderPriceChart(data) {
             const ctx = document.getElementById('priceChart').getContext('2d');
 
+            // Always destroy existing chart to ensure clean state
+            if (priceChart) {
+                priceChart.destroy();
+                priceChart = null;
+            }
+
             if (!data || data.length === 0) {
-                if (priceChart) priceChart.destroy();
                 return;
             }
 
             // Group by symbol (sort alphabetically for consistent order)
             const symbols = [...new Set(data.map(d => d.symbol))].sort();
-            const datasets = symbols.map((symbol, i) => {
+            const datasets = symbols.map((symbol) => {
                 const symbolData = data.filter(d => d.symbol === symbol);
-                const color = getSymbolColor(symbol, i);
+                const color = getSymbolColor(symbol);
                 return {
                     label: symbol,
                     data: symbolData.map(d => ({
-                        x: new Date(d.timestamp),
+                        x: parseTimestamp(d.timestamp),
                         y: d.price
                     })),
                     borderColor: color,
@@ -370,38 +393,34 @@
                 };
             });
 
-            if (priceChart) {
-                priceChart.data.datasets = datasets;
-                priceChart.update('none');
-            } else {
-                priceChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { intersect: false, mode: 'index' },
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: { color: '#a0a0a0' }
-                            }
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,  // Disable animation for smoother updates
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { color: '#a0a0a0' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'minute' },
+                            grid: { color: '#333' },
+                            ticks: { color: '#a0a0a0' }
                         },
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: { unit: 'minute' },
-                                grid: { color: '#333' },
-                                ticks: { color: '#a0a0a0' }
-                            },
-                            y: {
-                                grid: { color: '#333' },
-                                ticks: { color: '#a0a0a0' }
-                            }
+                        y: {
+                            grid: { color: '#333' },
+                            ticks: { color: '#a0a0a0' }
                         }
                     }
-                });
-            }
+                }
+            });
         }
 
         function renderRecentTicks(data) {
@@ -424,7 +443,7 @@
                     <tbody>
                         ${data.slice(0, 10).map(item => `
                             <tr>
-                                <td>${new Date(item.timestamp).toLocaleTimeString()}</td>
+                                <td>${parseTimestamp(item.timestamp).toLocaleTimeString()}</td>
                                 <td>${item.symbol}</td>
                                 <td class="text-right">$${item.price.toFixed(2)}</td>
                                 <td class="text-right">${item.volume.toLocaleString()}</td>
@@ -471,8 +490,13 @@
         function renderVolumeChart(data) {
             const ctx = document.getElementById('volumeChart').getContext('2d');
 
+            // Always destroy existing chart to ensure clean state
+            if (volumeChart) {
+                volumeChart.destroy();
+                volumeChart = null;
+            }
+
             if (!data || data.length === 0) {
-                if (volumeChart) volumeChart.destroy();
                 return;
             }
 
@@ -482,37 +506,33 @@
                 labels: sortedData.map(d => d.symbol),
                 datasets: [{
                     data: sortedData.map(d => d.total_volume),
-                    backgroundColor: sortedData.map((d, i) => getSymbolColor(d.symbol, i)),
+                    backgroundColor: sortedData.map((d) => getSymbolColor(d.symbol)),
                     borderWidth: 0,
                 }]
             };
 
-            if (volumeChart) {
-                volumeChart.data = chartData;
-                volumeChart.update('none');
-            } else {
-                volumeChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: chartData,
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
+            volumeChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,  // Disable animation for smoother updates
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#a0a0a0' }
                         },
-                        scales: {
-                            x: {
-                                grid: { display: false },
-                                ticks: { color: '#a0a0a0' }
-                            },
-                            y: {
-                                grid: { color: '#333' },
-                                ticks: { color: '#a0a0a0' }
-                            }
+                        y: {
+                            grid: { color: '#333' },
+                            ticks: { color: '#a0a0a0' }
                         }
                     }
-                });
-            }
+                }
+            });
         }
 
         function updateFooter(count) {
