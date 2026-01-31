@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Ticks Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #242424;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent-green: #00d26a;
+            --accent-red: #ff4444;
+            --accent-blue: #4a9eff;
+            --border-color: #333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .controls select, .controls button {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .controls button:hover {
+            background: var(--bg-secondary);
+        }
+
+        .controls button.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .status {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .status.connected {
+            color: var(--accent-green);
+        }
+
+        /* Price Cards */
+        .price-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .price-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .price-card .symbol {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .price-card .price {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .price-card .details {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1000px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+        }
+
+        /* Chart */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 30px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* No data */
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📈 Stock Ticks Dashboard</h1>
+            <div class="controls">
+                <select id="refreshInterval">
+                    <option value="0">Auto-refresh: Off</option>
+                    <option value="2000">Every 2s</option>
+                    <option value="5000" selected>Every 5s</option>
+                    <option value="10000">Every 10s</option>
+                </select>
+                <button id="refreshBtn">🔄 Refresh</button>
+                <span class="status" id="status">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Latest Prices -->
+        <section id="priceCards" class="price-cards">
+            <div class="loading">Loading prices...</div>
+        </section>
+
+        <!-- Chart and Recent Ticks -->
+        <div class="grid">
+            <div class="card">
+                <h2>📊 Price History</h2>
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>🕐 Recent Ticks</h2>
+                <div id="recentTicks">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="card">
+                <h2>📉 Price Statistics</h2>
+                <div id="priceStats">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>📦 Volume by Symbol</h2>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <span id="totalCount">Total ticks: --</span> |
+            <span id="lastUpdate">Last updated: --</span>
+        </footer>
+    </div>
+
+    <script>
+        // =============================================================================
+        // STATE
+        // =============================================================================
+        let priceChart = null;
+        let volumeChart = null;
+        let refreshTimer = null;
+        const colors = ['#4a9eff', '#00d26a', '#ff4444', '#ffd700', '#9b59b6', '#e91e63'];
+
+        // =============================================================================
+        // API CALLS
+        // =============================================================================
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // =============================================================================
+        // RENDER FUNCTIONS
+        // =============================================================================
+
+        function renderPriceCards(data) {
+            const container = document.getElementById('priceCards');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">No data yet. Make sure producer and consumer are running.</div>';
+                return;
+            }
+
+            container.innerHTML = data.map((item, i) => `
+                <div class="price-card">
+                    <div class="symbol">${item.symbol}</div>
+                    <div class="price" style="color: ${colors[i % colors.length]}">
+                        $${item.price.toFixed(2)}
+                    </div>
+                    <div class="details">
+                        Volume: ${item.volume.toLocaleString()}<br>
+                        ${new Date(item.last_update).toLocaleTimeString()}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPriceChart(data) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+
+            if (!data || data.length === 0) {
+                if (priceChart) priceChart.destroy();
+                return;
+            }
+
+            // Group by symbol
+            const symbols = [...new Set(data.map(d => d.symbol))];
+            const datasets = symbols.map((symbol, i) => {
+                const symbolData = data.filter(d => d.symbol === symbol);
+                return {
+                    label: symbol,
+                    data: symbolData.map(d => ({
+                        x: new Date(d.timestamp),
+                        y: d.price
+                    })),
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '20',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 0,
+                };
+            });
+
+            if (priceChart) {
+                priceChart.data.datasets = datasets;
+                priceChart.update('none');
+            } else {
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { color: '#a0a0a0' }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'minute' },
+                                grid: { color: '#333' },
+                                ticks: { color: '#a0a0a0' }
+                            },
+                            y: {
+                                grid: { color: '#333' },
+                                ticks: { color: '#a0a0a0' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderRecentTicks(data) {
+            const container = document.getElementById('recentTicks');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">No recent ticks</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th class="text-right">Price</th>
+                            <th class="text-right">Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.slice(0, 10).map(item => `
+                            <tr>
+                                <td>${new Date(item.timestamp).toLocaleTimeString()}</td>
+                                <td>${item.symbol}</td>
+                                <td class="text-right">$${item.price.toFixed(2)}</td>
+                                <td class="text-right">${item.volume.toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderPriceStats(data) {
+            const container = document.getElementById('priceStats');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">No statistics available</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th class="text-right">Ticks</th>
+                            <th class="text-right">Min</th>
+                            <th class="text-right">Max</th>
+                            <th class="text-right">Avg</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(item => `
+                            <tr>
+                                <td>${item.symbol}</td>
+                                <td class="text-right">${item.tick_count.toLocaleString()}</td>
+                                <td class="text-right">$${item.min_price.toFixed(2)}</td>
+                                <td class="text-right">$${item.max_price.toFixed(2)}</td>
+                                <td class="text-right">$${item.avg_price.toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderVolumeChart(data) {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+
+            if (!data || data.length === 0) {
+                if (volumeChart) volumeChart.destroy();
+                return;
+            }
+
+            const chartData = {
+                labels: data.map(d => d.symbol),
+                datasets: [{
+                    data: data.map(d => d.total_volume),
+                    backgroundColor: data.map((_, i) => colors[i % colors.length]),
+                    borderWidth: 0,
+                }]
+            };
+
+            if (volumeChart) {
+                volumeChart.data = chartData;
+                volumeChart.update('none');
+            } else {
+                volumeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#a0a0a0' }
+                            },
+                            y: {
+                                grid: { color: '#333' },
+                                ticks: { color: '#a0a0a0' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateFooter(count) {
+            document.getElementById('totalCount').textContent = `Total ticks: ${count ? count.toLocaleString() : '--'}`;
+            document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // =============================================================================
+        // MAIN REFRESH
+        // =============================================================================
+
+        async function refresh() {
+            const status = document.getElementById('status');
+            status.textContent = 'Updating...';
+            status.className = 'status';
+
+            try {
+                const [latest, history, recent, stats, count] = await Promise.all([
+                    fetchAPI('latest'),
+                    fetchAPI('history?minutes=60'),
+                    fetchAPI('recent?limit=20'),
+                    fetchAPI('stats'),
+                    fetchAPI('count')
+                ]);
+
+                renderPriceCards(latest);
+                renderPriceChart(history);
+                renderRecentTicks(recent);
+                renderPriceStats(stats);
+                renderVolumeChart(stats);
+                updateFooter(count?.count);
+
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+            } catch (error) {
+                status.textContent = 'Error';
+                status.className = 'status';
+                console.error('Refresh error:', error);
+            }
+        }
+
+        // =============================================================================
+        // EVENT LISTENERS
+        // =============================================================================
+
+        document.getElementById('refreshBtn').addEventListener('click', refresh);
+
+        document.getElementById('refreshInterval').addEventListener('change', (e) => {
+            if (refreshTimer) clearInterval(refreshTimer);
+
+            const interval = parseInt(e.target.value);
+            if (interval > 0) {
+                refreshTimer = setInterval(refresh, interval);
+            }
+        });
+
+        // =============================================================================
+        // INIT
+        // =============================================================================
+
+        // Load Chart.js date adapter
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js';
+        script.onload = () => {
+            refresh();
+            // Start auto-refresh with default interval
+            const defaultInterval = parseInt(document.getElementById('refreshInterval').value);
+            if (defaultInterval > 0) {
+                refreshTimer = setInterval(refresh, defaultInterval);
+            }
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
