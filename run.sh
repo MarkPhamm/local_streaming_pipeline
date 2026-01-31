@@ -5,11 +5,13 @@
 # Starts: Producer -> Consumer (Spark or Flink) -> Dashboard (Streamlit or Web)
 #
 # Usage:
-#   ./run.sh                    # Default: Spark + Streamlit
-#   ./run.sh spark              # Spark + Streamlit
-#   ./run.sh flink              # Flink + Streamlit
-#   ./run.sh spark web          # Spark + Web dashboard
-#   ./run.sh flink web          # Flink + Web dashboard
+#   ./run.sh                         # Default: synthetic + Spark + Streamlit
+#   ./run.sh spark                   # Spark + Streamlit
+#   ./run.sh flink                   # Flink + Streamlit
+#   ./run.sh spark web               # Spark + Web dashboard
+#   ./run.sh flink web               # Flink + Web dashboard
+#   ./run.sh --crypto                # Use real crypto data (Binance)
+#   ./run.sh flink web --crypto      # Flink + Web + real crypto data
 # =============================================================================
 
 set -e
@@ -19,27 +21,49 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Consumer type (default: spark)
-CONSUMER_TYPE="${1:-spark}"
+# Default values
+CONSUMER_TYPE="spark"
+DASHBOARD_TYPE="streamlit"
+DATA_SOURCE="synthetic"
 
-# Dashboard type (default: streamlit)
-DASHBOARD_TYPE="${2:-streamlit}"
-
-# Validate consumer type
-if [[ "$CONSUMER_TYPE" != "spark" && "$CONSUMER_TYPE" != "flink" ]]; then
-    echo -e "${RED}Error: Invalid consumer type '$CONSUMER_TYPE'${NC}"
-    echo "Usage: ./run.sh [spark|flink] [streamlit|web]"
-    exit 1
-fi
-
-# Validate dashboard type
-if [[ "$DASHBOARD_TYPE" != "streamlit" && "$DASHBOARD_TYPE" != "web" ]]; then
-    echo -e "${RED}Error: Invalid dashboard type '$DASHBOARD_TYPE'${NC}"
-    echo "Usage: ./run.sh [spark|flink] [streamlit|web]"
-    exit 1
-fi
+# Parse arguments
+for arg in "$@"; do
+    case $arg in
+        spark)
+            CONSUMER_TYPE="spark"
+            ;;
+        flink)
+            CONSUMER_TYPE="flink"
+            ;;
+        streamlit)
+            DASHBOARD_TYPE="streamlit"
+            ;;
+        web)
+            DASHBOARD_TYPE="web"
+            ;;
+        --crypto|crypto)
+            DATA_SOURCE="crypto"
+            ;;
+        --synthetic|synthetic)
+            DATA_SOURCE="synthetic"
+            ;;
+        --help|-h)
+            echo "Usage: ./run.sh [spark|flink] [streamlit|web] [--crypto|--synthetic]"
+            echo ""
+            echo "Options:"
+            echo "  spark       Use Spark Structured Streaming (micro-batch)"
+            echo "  flink       Use Flink (true streaming)"
+            echo "  streamlit   Use Streamlit dashboard (port 8501)"
+            echo "  web         Use FastAPI web dashboard (port 8502)"
+            echo "  --crypto    Use real-time crypto data from Coinbase"
+            echo "  --synthetic Use synthetic stock data (default)"
+            exit 0
+            ;;
+    esac
+done
 
 # PIDs for cleanup
 PRODUCER_PID=""
@@ -61,7 +85,7 @@ cleanup() {
     fi
 
     if [ -n "$PRODUCER_PID" ]; then
-        echo "Stopping Producer (PID: $PRODUCER_PID)"
+        echo "Stopping producer (PID: $PRODUCER_PID)"
         kill $PRODUCER_PID 2>/dev/null || true
     fi
 
@@ -88,6 +112,11 @@ if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
 else
     echo "  Dashboard: Web/FastAPI (port 8502)"
 fi
+if [ "$DATA_SOURCE" == "crypto" ]; then
+    echo -e "  Data: ${CYAN}Real-time Crypto (Coinbase)${GREEN}"
+else
+    echo "  Data: Synthetic stocks"
+fi
 echo "=============================================="
 echo -e "${NC}"
 
@@ -106,10 +135,17 @@ fi
 echo -e "${GREEN}Docker containers are running.${NC}\n"
 
 # Start Producer
-echo -e "${YELLOW}Starting Producer...${NC}"
-python src/producer/producer.py &
-PRODUCER_PID=$!
-echo -e "${GREEN}Producer started (PID: $PRODUCER_PID)${NC}\n"
+if [ "$DATA_SOURCE" == "crypto" ]; then
+    echo -e "${YELLOW}Starting Crypto Producer (Coinbase WebSocket)...${NC}"
+    python src/producer/crypto_producer.py &
+    PRODUCER_PID=$!
+    echo -e "${GREEN}Crypto Producer started (PID: $PRODUCER_PID)${NC}\n"
+else
+    echo -e "${YELLOW}Starting Synthetic Producer...${NC}"
+    python src/producer/producer.py &
+    PRODUCER_PID=$!
+    echo -e "${GREEN}Synthetic Producer started (PID: $PRODUCER_PID)${NC}\n"
+fi
 
 # Wait a moment for producer to start sending data
 sleep 2
@@ -139,8 +175,13 @@ if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
     DASHBOARD_URL="http://localhost:8501"
     echo -e "${GREEN}Streamlit started (PID: $DASHBOARD_PID)${NC}\n"
 else
-    echo -e "${YELLOW}Starting Web Dashboard (FastAPI)...${NC}"
-    python src/dashboard/web_app.py &
+    if [ "$DATA_SOURCE" == "crypto" ]; then
+        echo -e "${YELLOW}Starting Crypto Web Dashboard (FastAPI)...${NC}"
+        python src/dashboard/web_app.py --crypto &
+    else
+        echo -e "${YELLOW}Starting Stock Web Dashboard (FastAPI)...${NC}"
+        python src/dashboard/web_app.py &
+    fi
     DASHBOARD_PID=$!
     DASHBOARD_URL="http://localhost:8502"
     echo -e "${GREEN}Web dashboard started (PID: $DASHBOARD_PID)${NC}\n"
@@ -151,7 +192,11 @@ echo -e "${GREEN}=============================================="
 echo "  All services running!"
 echo "=============================================="
 echo -e "${NC}"
-echo "  Producer:   PID $PRODUCER_PID"
+if [ "$DATA_SOURCE" == "crypto" ]; then
+    echo -e "  Producer:   PID $PRODUCER_PID ${CYAN}(Coinbase Crypto)${NC}"
+else
+    echo -e "  Producer:   PID $PRODUCER_PID ${BLUE}(Synthetic)${NC}"
+fi
 if [ "$CONSUMER_TYPE" == "spark" ]; then
     echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark)${NC}"
 else
