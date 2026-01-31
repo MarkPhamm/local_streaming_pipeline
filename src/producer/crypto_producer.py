@@ -4,7 +4,7 @@ Real-Time Crypto Producer
 Streams real-time cryptocurrency prices from Coinbase WebSocket to Kafka.
 No API key required - uses public Coinbase WebSocket API.
 
-Symbols: BTC, ETH, SOL, XRP, DOGE (vs USD)
+Symbols: BTC, ETH, SOL, XRP, DOGE, LTC (vs USD)
 
 Usage:
     python src/producer/crypto_producer.py
@@ -25,7 +25,7 @@ KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 KAFKA_TOPIC = "stock-ticks"  # Reuse same topic for compatibility
 
 # Crypto symbols to track (Coinbase product IDs)
-PRODUCTS = ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD"]
+PRODUCTS = ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "LTC-USD"]
 
 # Map Coinbase product IDs to display names
 SYMBOL_NAMES = {
@@ -34,6 +34,7 @@ SYMBOL_NAMES = {
     "SOL-USD": "SOL",
     "XRP-USD": "XRP",
     "DOGE-USD": "DOGE",
+    "LTC-USD": "LTC",
 }
 
 # =============================================================================

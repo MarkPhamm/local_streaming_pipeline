@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,8 +83,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
         }
 
         .controls {
@@ -92,7 +100,8 @@
             align-items: center;
         }
 
-        .controls select, .controls button {
+        .controls select,
+        .controls button {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
@@ -111,15 +120,27 @@
         /* Price Cards */
         .price-cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
             margin-bottom: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            .price-cards {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 700px) {
+            .price-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .price-card {
             background: var(--bg-card);
-            border-radius: 16px;
-            padding: 24px;
+            border-radius: 12px;
+            padding: 16px;
             border: 1px solid var(--border-color);
             position: relative;
             overflow: hidden;
@@ -142,37 +163,37 @@
         }
 
         .price-card .symbol {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .price-card .symbol .icon {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: bold;
         }
 
         .price-card .price {
-            font-size: 2.2rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             font-family: 'SF Pro Display', -apple-system, sans-serif;
         }
 
         .price-card .details {
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
-            line-height: 1.6;
+            line-height: 1.4;
         }
 
         /* Grid Layout */
@@ -216,7 +237,8 @@
             font-size: 0.85rem;
         }
 
-        th, td {
+        th,
+        td {
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
@@ -272,13 +294,35 @@
         }
 
         /* Loading & No data */
-        .loading, .no-data {
+        .loading,
+        .no-data {
             text-align: center;
             padding: 40px;
             color: var(--text-secondary);
         }
+
+        /* Individual Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 850px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card h3 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -292,8 +336,8 @@
             <div class="controls">
                 <select id="refreshInterval">
                     <option value="0">Auto-refresh: Off</option>
-                    <option value="1000">Every 1s</option>
-                    <option value="2000" selected>Every 2s</option>
+                    <option value="1000" selected>Every 1s</option>
+                    <option value="2000">Every 2s</option>
                     <option value="5000">Every 5s</option>
                 </select>
                 <button id="refreshBtn">⟳ Refresh</button>
@@ -305,19 +349,71 @@
             <div class="loading">Connecting to market data...</div>
         </section>
 
-        <!-- Chart and Recent Trades -->
-        <div class="grid">
-            <div class="card">
-                <h2>📈 Price Chart (Last Hour)</h2>
-                <div class="chart-container">
-                    <canvas id="priceChart"></canvas>
+        <!-- Chart Controls -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <h2 style="margin: 0;">📈 Price Charts</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="color: var(--text-secondary); font-size: 0.85rem;">View:</label>
+                    <select id="chartMode"
+                        style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 6px;">
+                        <option value="individual">Individual Charts</option>
+                        <option value="single">Single Chart</option>
+                    </select>
+                    <select id="singleSymbol"
+                        style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 6px; display: none;">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
+                        <option value="XRP">XRP</option>
+                        <option value="DOGE">DOGE</option>
+                        <option value="LTC">LTC</option>
+                    </select>
                 </div>
             </div>
-            <div class="card">
-                <h2>⚡ Recent Trades</h2>
-                <div id="recentTicks">
-                    <div class="loading">Loading...</div>
-                </div>
+        </div>
+
+        <!-- Individual Charts Grid -->
+        <div id="individualCharts" class="charts-grid">
+            <div class="card chart-card">
+                <h3 style="color: #f7931a;">₿ BTC/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-BTC"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #627eea;">Ξ ETH/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-ETH"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #00ffa3;">◎ SOL/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-SOL"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #00aae4;">✕ XRP/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-XRP"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #c2a633;">Ð DOGE/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-DOGE"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #bfbbbb;">Ł LTC/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-LTC"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Single Combined Chart -->
+        <div id="singleChartContainer" class="card" style="display: none; margin-bottom: 20px;">
+            <div class="chart-container" style="height: 350px;">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>⚡ Recent Trades</h2>
+            <div id="recentTicks">
+                <div class="loading">Loading...</div>
             </div>
         </div>
 
@@ -350,10 +446,13 @@
         // =============================================================================
         let priceChart = null;
         let volumeChart = null;
+        let individualCharts = {};  // Store individual chart instances
         let refreshTimer = null;
+        let chartMode = 'individual';  // 'individual' or 'single'
+        let selectedSymbol = 'BTC';
 
         // Crypto symbols to display
-        const SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE'];
+        const SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'LTC'];
         const SYMBOLS_PARAM = SYMBOLS.join(',');
 
         // Fixed color mapping for crypto (consistent colors everywhere)
@@ -363,6 +462,7 @@
             'SOL': '#00ffa3',    // Solana Green
             'XRP': '#00aae4',    // XRP Blue
             'DOGE': '#c2a633',   // Dogecoin Gold
+            'LTC': '#bfbbbb',    // Litecoin Silver
         };
 
         const symbolIcons = {
@@ -371,6 +471,7 @@
             'SOL': '◎',
             'XRP': '✕',
             'DOGE': 'Ð',
+            'LTC': 'Ł',
         };
 
         function getSymbolColor(symbol) {
@@ -444,39 +545,111 @@
         }
 
         function renderPriceChart(data) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
+            if (!data || data.length === 0) {
+                return;
+            }
+
+            if (chartMode === 'individual') {
+                renderIndividualCharts(data);
+            } else {
+                renderSingleChart(data);
+            }
+        }
+
+        function renderIndividualCharts(data) {
+            // Destroy existing individual charts
+            Object.values(individualCharts).forEach(chart => chart.destroy());
+            individualCharts = {};
+
+            SYMBOLS.forEach(symbol => {
+                const canvas = document.getElementById(`chart-${symbol}`);
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                const symbolData = data.filter(d => d.symbol === symbol);
+                const color = getSymbolColor(symbol);
+
+                if (symbolData.length === 0) return;
+
+                individualCharts[symbol] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: symbol,
+                            data: symbolData.map(d => ({
+                                x: parseTimestamp(d.timestamp),
+                                y: d.price
+                            })),
+                            borderColor: color,
+                            backgroundColor: color + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'minute' },
+                                grid: { color: '#2a2a4a' },
+                                ticks: { color: '#8888aa', maxTicksLimit: 6 }
+                            },
+                            y: {
+                                grid: { color: '#2a2a4a' },
+                                ticks: {
+                                    color: '#8888aa',
+                                    callback: (val) => '$' + formatPrice(val)
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderSingleChart(data) {
+            const canvas = document.getElementById('priceChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
 
             if (priceChart) {
                 priceChart.destroy();
                 priceChart = null;
             }
 
-            if (!data || data.length === 0) {
-                return;
-            }
+            // Filter for selected symbol only
+            const symbolData = data.filter(d => d.symbol === selectedSymbol);
+            const color = getSymbolColor(selectedSymbol);
 
-            const symbols = [...new Set(data.map(d => d.symbol))].sort();
-            const datasets = symbols.map((symbol) => {
-                const symbolData = data.filter(d => d.symbol === symbol);
-                const color = getSymbolColor(symbol);
-                return {
-                    label: symbol,
-                    data: symbolData.map(d => ({
-                        x: parseTimestamp(d.timestamp),
-                        y: d.price
-                    })),
-                    borderColor: color,
-                    backgroundColor: color + '20',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1,
-                    pointRadius: 0,
-                };
-            });
+            if (symbolData.length === 0) return;
 
             priceChart = new Chart(ctx, {
                 type: 'line',
-                data: { datasets },
+                data: {
+                    datasets: [{
+                        label: selectedSymbol + '/USD',
+                        data: symbolData.map(d => ({
+                            x: parseTimestamp(d.timestamp),
+                            y: d.price
+                        })),
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 0,
+                    }]
+                },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -488,7 +661,8 @@
                             labels: {
                                 color: '#8888aa',
                                 usePointStyle: true,
-                                padding: 20
+                                padding: 20,
+                                font: { size: 14 }
                             }
                         }
                     },
@@ -501,7 +675,10 @@
                         },
                         y: {
                             grid: { color: '#2a2a4a' },
-                            ticks: { color: '#8888aa' }
+                            ticks: {
+                                color: '#8888aa',
+                                callback: (val) => '$' + formatPrice(val)
+                            }
                         }
                     }
                 }
@@ -527,8 +704,8 @@
                     </thead>
                     <tbody>
                         ${data.slice(0, 10).map(item => {
-                            const color = getSymbolColor(item.symbol);
-                            return `
+                const color = getSymbolColor(item.symbol);
+                return `
                                 <tr>
                                     <td>${parseTimestamp(item.timestamp).toLocaleTimeString()}</td>
                                     <td style="color: ${color}">${item.symbol}</td>
@@ -536,7 +713,7 @@
                                     <td class="text-right">${item.volume.toLocaleString()}</td>
                                 </tr>
                             `;
-                        }).join('')}
+            }).join('')}
                     </tbody>
                 </table>
             `;
@@ -564,8 +741,8 @@
                     </thead>
                     <tbody>
                         ${sortedData.map(item => {
-                            const color = getSymbolColor(item.symbol);
-                            return `
+                const color = getSymbolColor(item.symbol);
+                return `
                                 <tr>
                                     <td style="color: ${color}">${item.symbol}</td>
                                     <td class="text-right">${item.tick_count.toLocaleString()}</td>
@@ -574,7 +751,7 @@
                                     <td class="text-right">$${formatPrice(item.avg_price)}</td>
                                 </tr>
                             `;
-                        }).join('')}
+            }).join('')}
                     </tbody>
                 </table>
             `;
@@ -672,6 +849,31 @@
             }
         });
 
+        // Chart mode selector
+        document.getElementById('chartMode').addEventListener('change', (e) => {
+            chartMode = e.target.value;
+            const singleSymbolSelect = document.getElementById('singleSymbol');
+            const individualChartsDiv = document.getElementById('individualCharts');
+            const singleChartDiv = document.getElementById('singleChartContainer');
+
+            if (chartMode === 'individual') {
+                singleSymbolSelect.style.display = 'none';
+                individualChartsDiv.style.display = 'grid';
+                singleChartDiv.style.display = 'none';
+            } else {
+                singleSymbolSelect.style.display = 'block';
+                individualChartsDiv.style.display = 'none';
+                singleChartDiv.style.display = 'block';
+            }
+            refresh();
+        });
+
+        // Single symbol selector
+        document.getElementById('singleSymbol').addEventListener('change', (e) => {
+            selectedSymbol = e.target.value;
+            refresh();
+        });
+
         // =============================================================================
         // INIT
         // =============================================================================
@@ -688,4 +890,5 @@
         document.head.appendChild(script);
     </script>
 </body>
+
 </html>
