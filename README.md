@@ -1,6 +1,8 @@
 # Local Streaming Pipeline
 
 A local streaming pipeline for learning real-time data processing with Kafka, Spark/Flink, and ClickHouse.
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/83ec60e1-3b75-4e4c-baf7-4acfa4c9bbd4" />
+
 
 ```text
 Producer --> Kafka --> Spark/Flink --> ClickHouse --> Dashboard
