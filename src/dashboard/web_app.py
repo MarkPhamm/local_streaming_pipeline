@@ -1,7 +1,7 @@
 """
-Stock Ticks Dashboard - Web API
+Stock/Crypto Dashboard - Web API
 
-A simple FastAPI backend that serves the stock dashboard
+A simple FastAPI backend that serves the dashboard
 and provides API endpoints for ClickHouse data.
 
 Run with:
@@ -9,8 +9,10 @@ Run with:
 
 Or:
     python src/dashboard/web_app.py
+    python src/dashboard/web_app.py --crypto   # Crypto dashboard
 """
 
+import argparse
 import os
 from contextlib import asynccontextmanager
 
@@ -18,6 +20,15 @@ import clickhouse_connect
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+# Parse command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("--crypto", action="store_true", help="Use crypto dashboard")
+parser.add_argument("--port", type=int, default=8502, help="Port to run on")
+args, _ = parser.parse_known_args()
+
+# Dashboard mode
+DASHBOARD_MODE = "crypto" if args.crypto else "stock"
 
 # =============================================================================
 # CLICKHOUSE CONNECTION
@@ -74,20 +85,28 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 async def root():
-    """Serve the main dashboard page."""
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    """Serve the main dashboard page based on mode."""
+    if DASHBOARD_MODE == "crypto":
+        return FileResponse(os.path.join(STATIC_DIR, "crypto_index.html"))
+    return FileResponse(os.path.join(STATIC_DIR, "stock_index.html"))
 
 
 @app.get("/api/latest")
-async def get_latest_prices():
+async def get_latest_prices(symbols: str = ""):
     """Get latest price for each symbol."""
-    query = """
+    symbol_filter = ""
+    if symbols:
+        symbol_list = ", ".join([f"'{s}'" for s in symbols.split(",")])
+        symbol_filter = f"WHERE symbol IN ({symbol_list})"
+
+    query = f"""
     SELECT
         symbol,
         argMax(price, timestamp) as price,
         argMax(volume, timestamp) as volume,
         max(timestamp) as last_update
     FROM ticks
+    {symbol_filter}
     GROUP BY symbol
     ORDER BY symbol
     """
@@ -106,12 +125,7 @@ async def get_latest_prices():
 @app.get("/api/history")
 async def get_price_history(symbols: str = "", minutes: int = 60):
     """Get price history for selected symbols."""
-    if not symbols:
-        # Get all symbols if none specified
-        symbols_result = get_client().query("SELECT DISTINCT symbol FROM ticks")
-        symbol_list = [row[0] for row in symbols_result.result_rows]
-    else:
-        symbol_list = symbols.split(",")
+    symbol_list = symbols.split(",") if symbols else []
 
     if not symbol_list:
         return []
@@ -141,8 +155,13 @@ async def get_price_history(symbols: str = "", minutes: int = 60):
 
 
 @app.get("/api/recent")
-async def get_recent_ticks(limit: int = 20):
+async def get_recent_ticks(symbols: str = "", limit: int = 20):
     """Get most recent ticks."""
+    symbol_filter = ""
+    if symbols:
+        symbol_list = ", ".join([f"'{s}'" for s in symbols.split(",")])
+        symbol_filter = f"WHERE symbol IN ({symbol_list})"
+
     query = f"""
     SELECT
         timestamp,
@@ -150,6 +169,7 @@ async def get_recent_ticks(limit: int = 20):
         price,
         volume
     FROM ticks
+    {symbol_filter}
     ORDER BY timestamp DESC
     LIMIT {limit}
     """
@@ -166,9 +186,14 @@ async def get_recent_ticks(limit: int = 20):
 
 
 @app.get("/api/stats")
-async def get_stats():
+async def get_stats(symbols: str = ""):
     """Get price statistics by symbol."""
-    query = """
+    symbol_filter = ""
+    if symbols:
+        symbol_list = ", ".join([f"'{s}'" for s in symbols.split(",")])
+        symbol_filter = f"WHERE symbol IN ({symbol_list})"
+
+    query = f"""
     SELECT
         symbol,
         count() as tick_count,
@@ -177,6 +202,7 @@ async def get_stats():
         round(avg(price), 2) as avg_price,
         sum(volume) as total_volume
     FROM ticks
+    {symbol_filter}
     GROUP BY symbol
     ORDER BY symbol
     """
@@ -195,9 +221,14 @@ async def get_stats():
 
 
 @app.get("/api/count")
-async def get_total_count():
+async def get_total_count(symbols: str = ""):
     """Get total tick count."""
-    result = get_client().query("SELECT count() FROM ticks")
+    symbol_filter = ""
+    if symbols:
+        symbol_list = ", ".join([f"'{s}'" for s in symbols.split(",")])
+        symbol_filter = f"WHERE symbol IN ({symbol_list})"
+
+    result = get_client().query(f"SELECT count() FROM ticks {symbol_filter}")
     return {"count": result.result_rows[0][0]}
 
 

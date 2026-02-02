@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Dashboard - Real-Time</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --text-primary: #ffffff;
+            --text-secondary: #8888aa;
+            --accent-green: #00ff88;
+            --accent-red: #ff3366;
+            --accent-gold: #f7931a;
+            --border-color: #2a2a4a;
+            --glow-color: rgba(0, 255, 136, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: var(--bg-primary);
+            background-image:
+                radial-gradient(ellipse at top, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom, rgba(247, 147, 26, 0.03) 0%, transparent 50%);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(90deg, var(--accent-gold), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--accent-green);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--accent-green);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .controls select,
+        .controls button {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .controls button:hover {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--glow-color);
+        }
+
+        /* Price Cards */
+        .price-cards {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            .price-cards {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 700px) {
+            .price-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .price-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .price-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .price-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-accent, var(--accent-gold));
+        }
+
+        .price-card .symbol {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .price-card .symbol .icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: bold;
+        }
+
+        .price-card .price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-family: 'SF Pro Display', -apple-system, sans-serif;
+        }
+
+        .price-card .details {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1000px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Chart */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 30px;
+        }
+
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-card);
+            padding: 4px 12px;
+            border-radius: 12px;
+            margin-left: 10px;
+        }
+
+        /* Loading & No data */
+        .loading,
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* Individual Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 850px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card h3 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>₿ Crypto Dashboard</h1>
+                <span class="live-badge">
+                    <span class="live-dot"></span>
+                    LIVE from Coinbase
+                </span>
+            </div>
+            <div class="controls">
+                <select id="refreshInterval">
+                    <option value="0">Auto-refresh: Off</option>
+                    <option value="1000" selected>Every 1s</option>
+                    <option value="2000">Every 2s</option>
+                    <option value="5000">Every 5s</option>
+                </select>
+                <button id="refreshBtn">⟳ Refresh</button>
+            </div>
+        </header>
+
+        <!-- Latest Prices -->
+        <section id="priceCards" class="price-cards">
+            <div class="loading">Connecting to market data...</div>
+        </section>
+
+        <!-- Chart Controls -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <h2 style="margin: 0;">📈 Price Charts</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label style="color: var(--text-secondary); font-size: 0.85rem;">View:</label>
+                    <select id="chartMode"
+                        style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 6px;">
+                        <option value="individual">Individual Charts</option>
+                        <option value="single">Single Chart</option>
+                    </select>
+                    <select id="singleSymbol"
+                        style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: 6px; display: none;">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
+                        <option value="XRP">XRP</option>
+                        <option value="DOGE">DOGE</option>
+                        <option value="LTC">LTC</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Individual Charts Grid -->
+        <div id="individualCharts" class="charts-grid">
+            <div class="card chart-card">
+                <h3 style="color: #f7931a;">₿ BTC/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-BTC"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #627eea;">Ξ ETH/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-ETH"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #00ffa3;">◎ SOL/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-SOL"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #00aae4;">✕ XRP/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-XRP"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #c2a633;">Ð DOGE/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-DOGE"></canvas></div>
+            </div>
+            <div class="card chart-card">
+                <h3 style="color: #bfbbbb;">Ł LTC/USD</h3>
+                <div class="chart-container" style="height: 200px;"><canvas id="chart-LTC"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Single Combined Chart -->
+        <div id="singleChartContainer" class="card" style="display: none; margin-bottom: 20px;">
+            <div class="chart-container" style="height: 350px;">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h2>⚡ Recent Trades</h2>
+            <div id="recentTicks">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="card">
+                <h2>📊 Price Statistics</h2>
+                <div id="priceStats">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>📦 Volume (24h)</h2>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <span id="totalCount">Total trades: --</span> |
+            <span id="lastUpdate">Last updated: --</span>
+            <span class="source-badge">Data: Coinbase WebSocket</span>
+        </footer>
+    </div>
+
+    <script>
+        // =============================================================================
+        // STATE
+        // =============================================================================
+        let priceChart = null;
+        let volumeChart = null;
+        let individualCharts = {};  // Store individual chart instances
+        let refreshTimer = null;
+        let chartMode = 'individual';  // 'individual' or 'single'
+        let selectedSymbol = 'BTC';
+
+        // Crypto symbols to display
+        const SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'LTC'];
+        const SYMBOLS_PARAM = SYMBOLS.join(',');
+
+        // Fixed color mapping for crypto (consistent colors everywhere)
+        const symbolColors = {
+            'BTC': '#f7931a',    // Bitcoin Orange
+            'ETH': '#627eea',    // Ethereum Blue
+            'SOL': '#00ffa3',    // Solana Green
+            'XRP': '#00aae4',    // XRP Blue
+            'DOGE': '#c2a633',   // Dogecoin Gold
+            'LTC': '#bfbbbb',    // Litecoin Silver
+        };
+
+        const symbolIcons = {
+            'BTC': '₿',
+            'ETH': 'Ξ',
+            'SOL': '◎',
+            'XRP': '✕',
+            'DOGE': 'Ð',
+            'LTC': 'Ł',
+        };
+
+        function getSymbolColor(symbol) {
+            if (symbolColors[symbol]) {
+                return symbolColors[symbol];
+            }
+            let hash = 0;
+            for (let i = 0; i < symbol.length; i++) {
+                hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            return `hsl(${hue}, 70%, 50%)`;
+        }
+
+        function parseTimestamp(ts) {
+            return new Date(ts.replace(' ', 'T') + 'Z');
+        }
+
+        function formatPrice(price) {
+            if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (price >= 1) return price.toFixed(2);
+            return price.toFixed(4);
+        }
+
+        // =============================================================================
+        // API CALLS
+        // =============================================================================
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // =============================================================================
+        // RENDER FUNCTIONS
+        // =============================================================================
+
+        function renderPriceCards(data) {
+            const container = document.getElementById('priceCards');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">Waiting for market data... Make sure the crypto producer is running.</div>';
+                return;
+            }
+
+            const sortedData = [...data].sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+            container.innerHTML = sortedData.map((item) => {
+                const color = getSymbolColor(item.symbol);
+                const icon = symbolIcons[item.symbol] || item.symbol[0];
+                return `
+                    <div class="price-card" style="--card-accent: ${color}">
+                        <div class="symbol">
+                            <span class="icon" style="background: ${color}22; color: ${color}">${icon}</span>
+                            ${item.symbol}/USD
+                        </div>
+                        <div class="price" style="color: ${color}">
+                            $${formatPrice(item.price)}
+                        </div>
+                        <div class="details">
+                            Volume: ${item.volume.toLocaleString()}<br>
+                            ${parseTimestamp(item.last_update).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPriceChart(data) {
+            if (!data || data.length === 0) {
+                return;
+            }
+
+            if (chartMode === 'individual') {
+                renderIndividualCharts(data);
+            } else {
+                renderSingleChart(data);
+            }
+        }
+
+        function renderIndividualCharts(data) {
+            // Destroy existing individual charts
+            Object.values(individualCharts).forEach(chart => chart.destroy());
+            individualCharts = {};
+
+            SYMBOLS.forEach(symbol => {
+                const canvas = document.getElementById(`chart-${symbol}`);
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                const symbolData = data.filter(d => d.symbol === symbol);
+                const color = getSymbolColor(symbol);
+
+                if (symbolData.length === 0) return;
+
+                individualCharts[symbol] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: symbol,
+                            data: symbolData.map(d => ({
+                                x: parseTimestamp(d.timestamp),
+                                y: d.price
+                            })),
+                            borderColor: color,
+                            backgroundColor: color + '20',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: { unit: 'minute' },
+                                grid: { color: '#2a2a4a' },
+                                ticks: { color: '#8888aa', maxTicksLimit: 6 }
+                            },
+                            y: {
+                                grid: { color: '#2a2a4a' },
+                                ticks: {
+                                    color: '#8888aa',
+                                    callback: (val) => '$' + formatPrice(val)
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderSingleChart(data) {
+            const canvas = document.getElementById('priceChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+
+            if (priceChart) {
+                priceChart.destroy();
+                priceChart = null;
+            }
+
+            // Filter for selected symbol only
+            const symbolData = data.filter(d => d.symbol === selectedSymbol);
+            const color = getSymbolColor(selectedSymbol);
+
+            if (symbolData.length === 0) return;
+
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: selectedSymbol + '/USD',
+                        data: symbolData.map(d => ({
+                            x: parseTimestamp(d.timestamp),
+                            y: d.price
+                        })),
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#8888aa',
+                                usePointStyle: true,
+                                padding: 20,
+                                font: { size: 14 }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'minute' },
+                            grid: { color: '#2a2a4a' },
+                            ticks: { color: '#8888aa' }
+                        },
+                        y: {
+                            grid: { color: '#2a2a4a' },
+                            ticks: {
+                                color: '#8888aa',
+                                callback: (val) => '$' + formatPrice(val)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderRecentTicks(data) {
+            const container = document.getElementById('recentTicks');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">No recent trades</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Pair</th>
+                            <th class="text-right">Price</th>
+                            <th class="text-right">Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.slice(0, 10).map(item => {
+                const color = getSymbolColor(item.symbol);
+                return `
+                                <tr>
+                                    <td>${parseTimestamp(item.timestamp).toLocaleTimeString()}</td>
+                                    <td style="color: ${color}">${item.symbol}</td>
+                                    <td class="text-right">$${formatPrice(item.price)}</td>
+                                    <td class="text-right">${item.volume.toLocaleString()}</td>
+                                </tr>
+                            `;
+            }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderPriceStats(data) {
+            const container = document.getElementById('priceStats');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="no-data">No statistics available</div>';
+                return;
+            }
+
+            const sortedData = [...data].sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th class="text-right">Trades</th>
+                            <th class="text-right">Low</th>
+                            <th class="text-right">High</th>
+                            <th class="text-right">Avg</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedData.map(item => {
+                const color = getSymbolColor(item.symbol);
+                return `
+                                <tr>
+                                    <td style="color: ${color}">${item.symbol}</td>
+                                    <td class="text-right">${item.tick_count.toLocaleString()}</td>
+                                    <td class="text-right">$${formatPrice(item.min_price)}</td>
+                                    <td class="text-right">$${formatPrice(item.max_price)}</td>
+                                    <td class="text-right">$${formatPrice(item.avg_price)}</td>
+                                </tr>
+                            `;
+            }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderVolumeChart(data) {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+
+            if (volumeChart) {
+                volumeChart.destroy();
+                volumeChart = null;
+            }
+
+            if (!data || data.length === 0) {
+                return;
+            }
+
+            const sortedData = [...data].sort((a, b) => a.symbol.localeCompare(b.symbol));
+            const chartData = {
+                labels: sortedData.map(d => d.symbol),
+                datasets: [{
+                    data: sortedData.map(d => d.total_volume),
+                    backgroundColor: sortedData.map((d) => getSymbolColor(d.symbol)),
+                    borderWidth: 0,
+                    borderRadius: 4,
+                }]
+            };
+
+            volumeChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#8888aa' }
+                        },
+                        y: {
+                            grid: { color: '#2a2a4a' },
+                            ticks: { color: '#8888aa' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateFooter(count) {
+            document.getElementById('totalCount').textContent = `Total trades: ${count ? count.toLocaleString() : '--'}`;
+            document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // =============================================================================
+        // MAIN REFRESH
+        // =============================================================================
+
+        async function refresh() {
+            try {
+                const [latest, history, recent, stats, count] = await Promise.all([
+                    fetchAPI(`latest?symbols=${SYMBOLS_PARAM}`),
+                    fetchAPI(`history?symbols=${SYMBOLS_PARAM}&minutes=60`),
+                    fetchAPI(`recent?symbols=${SYMBOLS_PARAM}&limit=20`),
+                    fetchAPI(`stats?symbols=${SYMBOLS_PARAM}`),
+                    fetchAPI(`count?symbols=${SYMBOLS_PARAM}`)
+                ]);
+
+                renderPriceCards(latest);
+                renderPriceChart(history);
+                renderRecentTicks(recent);
+                renderPriceStats(stats);
+                renderVolumeChart(stats);
+                updateFooter(count?.count);
+            } catch (error) {
+                console.error('Refresh error:', error);
+            }
+        }
+
+        // =============================================================================
+        // EVENT LISTENERS
+        // =============================================================================
+
+        document.getElementById('refreshBtn').addEventListener('click', refresh);
+
+        document.getElementById('refreshInterval').addEventListener('change', (e) => {
+            if (refreshTimer) clearInterval(refreshTimer);
+
+            const interval = parseInt(e.target.value);
+            if (interval > 0) {
+                refreshTimer = setInterval(refresh, interval);
+            }
+        });
+
+        // Chart mode selector
+        document.getElementById('chartMode').addEventListener('change', (e) => {
+            chartMode = e.target.value;
+            const singleSymbolSelect = document.getElementById('singleSymbol');
+            const individualChartsDiv = document.getElementById('individualCharts');
+            const singleChartDiv = document.getElementById('singleChartContainer');
+
+            if (chartMode === 'individual') {
+                singleSymbolSelect.style.display = 'none';
+                individualChartsDiv.style.display = 'grid';
+                singleChartDiv.style.display = 'none';
+            } else {
+                singleSymbolSelect.style.display = 'block';
+                individualChartsDiv.style.display = 'none';
+                singleChartDiv.style.display = 'block';
+            }
+            refresh();
+        });
+
+        // Single symbol selector
+        document.getElementById('singleSymbol').addEventListener('change', (e) => {
+            selectedSymbol = e.target.value;
+            refresh();
+        });
+
+        // =============================================================================
+        // INIT
+        // =============================================================================
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js';
+        script.onload = () => {
+            refresh();
+            const defaultInterval = parseInt(document.getElementById('refreshInterval').value);
+            if (defaultInterval > 0) {
+                refreshTimer = setInterval(refresh, defaultInterval);
+            }
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+
+</html>

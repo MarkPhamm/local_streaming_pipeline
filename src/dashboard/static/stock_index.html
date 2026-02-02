@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Ticks Dashboard</title>
+    <title>Stock Dashboard - Synthetic Data</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -286,6 +286,10 @@
         let volumeChart = null;
         let refreshTimer = null;
 
+        // Stock symbols to display
+        const SYMBOLS = ['AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT'];
+        const SYMBOLS_PARAM = SYMBOLS.join(',');
+
         // Fixed color mapping for each symbol (consistent colors everywhere)
         const symbolColors = {
             'AAPL': '#4a9eff',   // Blue
@@ -293,9 +297,6 @@
             'GOOGL': '#ffd700',  // Gold
             'META': '#ff4444',   // Red
             'MSFT': '#9b59b6',   // Purple
-            'TSLA': '#e91e63',   // Pink
-            'NVDA': '#00bcd4',   // Cyan
-            'NFLX': '#ff9800',   // Orange
         };
 
         function getSymbolColor(symbol) {
@@ -551,11 +552,11 @@
 
             try {
                 const [latest, history, recent, stats, count] = await Promise.all([
-                    fetchAPI('latest'),
-                    fetchAPI('history?minutes=60'),
-                    fetchAPI('recent?limit=20'),
-                    fetchAPI('stats'),
-                    fetchAPI('count')
+                    fetchAPI(`latest?symbols=${SYMBOLS_PARAM}`),
+                    fetchAPI(`history?symbols=${SYMBOLS_PARAM}&minutes=60`),
+                    fetchAPI(`recent?symbols=${SYMBOLS_PARAM}&limit=20`),
+                    fetchAPI(`stats?symbols=${SYMBOLS_PARAM}`),
+                    fetchAPI(`count?symbols=${SYMBOLS_PARAM}`)
                 ]);
 
                 renderPriceCards(latest);
