@@ -51,6 +51,12 @@
             margin-bottom: 30px;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
         h1 {
             font-size: 1.8rem;
             display: flex;
@@ -62,19 +68,32 @@
             background-clip: text;
         }
 
-        .live-badge {
+        .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
             background: rgba(0, 255, 136, 0.1);
             border: 1px solid var(--accent-green);
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
             font-size: 0.75rem;
             color: var(--accent-green);
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
 
-        .live-dot {
+        .status-badge.disconnected {
+            background: rgba(255, 51, 102, 0.1);
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .status-badge.disconnected .status-dot {
+            background: var(--accent-red);
+            animation: none;
+        }
+
+        .status-dot {
             width: 8px;
             height: 8px;
             background: var(--accent-green);
@@ -83,20 +102,13 @@
         }
 
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.4;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
 
         .controls {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             align-items: center;
         }
 
@@ -326,20 +338,14 @@
 <body>
     <div class="container">
         <header>
-            <div>
+            <div class="header-left">
                 <h1>₿ Crypto Dashboard</h1>
-                <span class="live-badge">
-                    <span class="live-dot"></span>
-                    LIVE from Coinbase
+                <span id="connectionStatus" class="status-badge">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Coinbase Live</span>
                 </span>
             </div>
             <div class="controls">
-                <select id="refreshInterval">
-                    <option value="0">Auto-refresh: Off</option>
-                    <option value="1000" selected>Every 1s</option>
-                    <option value="2000">Every 2s</option>
-                    <option value="5000">Every 5s</option>
-                </select>
                 <button id="refreshBtn">⟳ Refresh</button>
             </div>
         </header>
@@ -447,7 +453,6 @@
         let priceChart = null;
         let volumeChart = null;
         let individualCharts = {};  // Store individual chart instances
-        let refreshTimer = null;
         let chartMode = 'individual';  // 'individual' or 'single'
         let selectedSymbol = 'BTC';
 
@@ -810,7 +815,7 @@
         }
 
         // =============================================================================
-        // MAIN REFRESH
+        // MAIN REFRESH (for initial load and manual refresh)
         // =============================================================================
 
         async function refresh() {
@@ -835,19 +840,126 @@
         }
 
         // =============================================================================
+        // SSE - Real-time Stream
+        // =============================================================================
+
+        let eventSource = null;
+        let tickBuffer = [];  // Buffer incoming ticks
+        let statsRefreshTimer = null;
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            if (connected) {
+                status.classList.remove('disconnected');
+                status.innerHTML = '<span class="status-dot"></span><span class="status-text">Coinbase Live</span>';
+            } else {
+                status.classList.add('disconnected');
+                status.innerHTML = '<span class="status-dot"></span><span class="status-text">Reconnecting...</span>';
+            }
+        }
+
+        function connectSSE() {
+            if (eventSource) eventSource.close();
+
+            eventSource = new EventSource(`/api/stream?symbols=${SYMBOLS_PARAM}`);
+
+            eventSource.onopen = () => {
+                updateConnectionStatus(true);
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const ticks = JSON.parse(event.data);
+                    if (ticks.error) {
+                        console.error('SSE error:', ticks.error);
+                        return;
+                    }
+                    if (ticks.length > 0) {
+                        // Update price cards with latest prices
+                        const latestBySymbol = {};
+                        ticks.forEach(t => {
+                            latestBySymbol[t.symbol] = t;
+                        });
+                        updatePriceCardsLive(latestBySymbol);
+
+                        // Prepend new ticks to recent trades
+                        updateRecentTicksLive(ticks);
+
+                        // Update footer
+                        updateFooter(null);
+                    }
+                } catch (e) {
+                    console.error('SSE parse error:', e);
+                }
+            };
+
+            eventSource.onerror = () => {
+                updateConnectionStatus(false);
+                eventSource.close();
+                // Reconnect after 2 seconds
+                setTimeout(connectSSE, 2000);
+            };
+        }
+
+        function updatePriceCardsLive(latestBySymbol) {
+            Object.entries(latestBySymbol).forEach(([symbol, tick]) => {
+                const cards = document.querySelectorAll('.price-card');
+                cards.forEach(card => {
+                    if (card.querySelector('.symbol')?.textContent?.includes(symbol)) {
+                        const priceEl = card.querySelector('.price');
+                        const detailsEl = card.querySelector('.details');
+                        if (priceEl) {
+                            const oldPrice = parseFloat(priceEl.textContent.replace(/[$,]/g, ''));
+                            priceEl.textContent = '$' + formatPrice(tick.price);
+                            // Flash green/red on price change
+                            if (tick.price > oldPrice) {
+                                priceEl.style.textShadow = '0 0 10px var(--accent-green)';
+                            } else if (tick.price < oldPrice) {
+                                priceEl.style.textShadow = '0 0 10px var(--accent-red)';
+                            }
+                            setTimeout(() => { priceEl.style.textShadow = 'none'; }, 300);
+                        }
+                        if (detailsEl) {
+                            detailsEl.innerHTML = `Volume: ${tick.volume.toLocaleString()}<br>${new Date(tick.timestamp.replace(' ', 'T') + 'Z').toLocaleTimeString()}`;
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateRecentTicksLive(newTicks) {
+            const container = document.getElementById('recentTicks');
+            const tbody = container.querySelector('tbody');
+            if (!tbody) return;
+
+            // Prepend new rows
+            const newRows = newTicks.reverse().map(item => {
+                const color = getSymbolColor(item.symbol);
+                const tr = document.createElement('tr');
+                tr.style.background = 'rgba(0, 255, 136, 0.05)';
+                tr.innerHTML = `
+                    <td>${parseTimestamp(item.timestamp).toLocaleTimeString()}</td>
+                    <td style="color: ${color}">${item.symbol}</td>
+                    <td class="text-right">$${formatPrice(item.price)}</td>
+                    <td class="text-right">${item.volume.toLocaleString()}</td>
+                `;
+                setTimeout(() => { tr.style.background = ''; }, 500);
+                return tr;
+            });
+
+            newRows.forEach(row => tbody.insertBefore(row, tbody.firstChild));
+
+            // Keep only 10 rows
+            while (tbody.children.length > 10) {
+                tbody.removeChild(tbody.lastChild);
+            }
+        }
+
+        // =============================================================================
         // EVENT LISTENERS
         // =============================================================================
 
         document.getElementById('refreshBtn').addEventListener('click', refresh);
-
-        document.getElementById('refreshInterval').addEventListener('change', (e) => {
-            if (refreshTimer) clearInterval(refreshTimer);
-
-            const interval = parseInt(e.target.value);
-            if (interval > 0) {
-                refreshTimer = setInterval(refresh, interval);
-            }
-        });
 
         // Chart mode selector
         document.getElementById('chartMode').addEventListener('change', (e) => {
@@ -881,11 +993,22 @@
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js';
         script.onload = () => {
+            // Initial full load
             refresh();
-            const defaultInterval = parseInt(document.getElementById('refreshInterval').value);
-            if (defaultInterval > 0) {
-                refreshTimer = setInterval(refresh, defaultInterval);
-            }
+            // Connect SSE for real-time tick updates
+            connectSSE();
+            // Refresh charts and stats every 5s (heavier queries)
+            statsRefreshTimer = setInterval(async () => {
+                const [history, stats, count] = await Promise.all([
+                    fetchAPI(`history?symbols=${SYMBOLS_PARAM}&minutes=60`),
+                    fetchAPI(`stats?symbols=${SYMBOLS_PARAM}`),
+                    fetchAPI(`count?symbols=${SYMBOLS_PARAM}`)
+                ]);
+                renderPriceChart(history);
+                renderPriceStats(stats);
+                renderVolumeChart(stats);
+                updateFooter(count?.count);
+            }, 5000);
         };
         document.head.appendChild(script);
     </script>

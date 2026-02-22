@@ -13,6 +13,8 @@ Or:
 """
 
 import argparse
+import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
 
@@ -20,6 +22,7 @@ import clickhouse_connect
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import StreamingResponse
 
 # Parse command line arguments
 parser = argparse.ArgumentParser()
@@ -237,6 +240,65 @@ async def get_symbols():
     """Get list of all symbols."""
     result = get_client().query("SELECT DISTINCT symbol FROM ticks ORDER BY symbol")
     return [row[0] for row in result.result_rows]
+
+
+# =============================================================================
+# SSE - Real-time Stream
+# =============================================================================
+
+last_seen_timestamp = {}
+
+
+@app.get("/api/stream")
+async def stream_ticks(symbols: str = ""):
+    """Stream new ticks via Server-Sent Events."""
+
+    async def event_generator():
+        last_ts = None
+        while True:
+            try:
+                symbol_filter = ""
+                if symbols:
+                    symbol_list = ", ".join([f"'{s}'" for s in symbols.split(",")])
+                    symbol_filter = f"AND symbol IN ({symbol_list})"
+
+                ts_filter = ""
+                if last_ts:
+                    ts_filter = f"AND timestamp > '{last_ts}'"
+
+                query = f"""
+                SELECT timestamp, symbol, price, volume
+                FROM ticks
+                WHERE 1=1 {symbol_filter} {ts_filter}
+                ORDER BY timestamp DESC
+                LIMIT 50
+                """
+                result = get_client().query(query)
+                rows = result.result_rows
+
+                if rows:
+                    last_ts = str(rows[0][0])
+                    ticks = [
+                        {
+                            "timestamp": str(r[0]),
+                            "symbol": r[1],
+                            "price": r[2],
+                            "volume": r[3],
+                        }
+                        for r in reversed(rows)
+                    ]
+                    yield f"data: {json.dumps(ticks)}\n\n"
+
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 # =============================================================================
