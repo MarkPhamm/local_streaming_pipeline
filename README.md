@@ -1,8 +1,11 @@
 # Local Streaming Pipeline
 
-A local streaming pipeline for learning real-time data processing with Kafka, Spark/Flink, and ClickHouse.
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/83ec60e1-3b75-4e4c-baf7-4acfa4c9bbd4" />
+<p align="center">
+  <img src="assets/demo.gif" alt="Demo" width="100%" />
+</p>
 
+> A local streaming pipeline for learning real-time data processing with Kafka, Spark/Flink, and ClickHouse.
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/83ec60e1-3b75-4e4c-baf7-4acfa4c9bbd4" />
 
 ```text
 Producer --> Kafka --> Spark/Flink --> ClickHouse --> Dashboard
@@ -222,8 +225,8 @@ SELECT * FROM stocks.ticks ORDER BY timestamp DESC LIMIT 10;
 
 | Dashboard | URL |
 |-----------|-----|
-| Web (FastAPI) | http://localhost:8502 |
-| Streamlit | http://localhost:8501 |
+| Web (FastAPI) | <http://localhost:8502> |
+| Streamlit | <http://localhost:8501> |
 
 ## Project Structure
 
