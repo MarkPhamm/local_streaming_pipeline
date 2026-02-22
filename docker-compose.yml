@@ -64,10 +64,10 @@ services:
   # =============================================================================
   # PRODUCER - Stock Data (Synthetic)
   # =============================================================================
-  producer:
+  stock-producer:
     build:
       context: ./src/producer
-    container_name: producer
+    container_name: stock-producer
     depends_on:
       kafka:
         condition: service_healthy
