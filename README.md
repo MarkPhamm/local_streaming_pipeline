@@ -80,10 +80,10 @@ The pipeline supports 4 configurations combining **processing engine** and **dat
 ```text
 +-------------------+       +-----------+       +-------------------+       +-------------+       +-------------+
 |                   |       |           |       |                   |       |             |       |             |
-| producer.py       | ----> |   Kafka   | ----> | Spark/Flink       | ----> | ClickHouse  | ----> | Dashboard   |
+| stock_producer.py       | ----> |   Kafka   | ----> | Spark/Flink       | ----> | ClickHouse  | ----> | Dashboard   |
 | (synthetic)       |       |           |       | Consumer          |       |             |       | (FastAPI)   |
 |        OR         |       |           |       |                   |       |             |       |             |
-| crypto_producer.py|       |           |       | spark_clickhouse  |       |             |       |             |
+| crypto_stock_producer.py|       |           |       | spark_clickhouse  |       |             |       |             |
 | (Coinbase)        |       |           |       |       OR          |       |             |       |             |
 |                   |       |           |       | flink_clickhouse  |       |             |       |             |
 +-------------------+       +-----------+       +-------------------+       +-------------+       +-------------+
@@ -182,10 +182,10 @@ Press `Ctrl+C` to stop all services.
 
 ```bash
 # Synthetic stocks
-python src/producer/producer.py
+python src/producer/stock_producer.py
 
 # OR Real crypto
-python src/producer/crypto_producer.py
+python src/producer/crypto_stock_producer.py
 ```
 
 **Terminal 2 - Consumer:**
@@ -235,8 +235,8 @@ local_streaming_pipeline/
 ├── lib/                     # Flink connector JARs
 ├── src/
 │   ├── producer/
-│   │   ├── producer.py          # Synthetic stock data
-│   │   └── crypto_producer.py   # Real-time Coinbase crypto
+│   │   ├── stock_producer.py          # Synthetic stock data
+│   │   └── crypto_stock_producer.py   # Real-time Coinbase crypto
 │   ├── consumer/
 │   │   ├── spark_consumer.py              # Spark -> Console
 │   │   ├── spark_clickhouse_consumer.py   # Spark -> ClickHouse

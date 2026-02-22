@@ -48,7 +48,7 @@ Column-based:
 ```text
 +-------------+       +-----------+       +------------------+       +-------------+
 |             |       |           |       |                  |       |             |
-| producer.py | ----> |   Kafka   | ----> | spark_consumer.py| ----> | ClickHouse  |
+| stock_producer.py | ----> |   Kafka   | ----> | spark_consumer.py| ----> | ClickHouse  |
 |             |       |           |       |                  |       |             |
 +-------------+       +-----------+       +------------------+       +-------------+
      |                     |                     |                         |

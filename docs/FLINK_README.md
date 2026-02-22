@@ -54,7 +54,7 @@ PyFlink lets you write Flink applications in Python instead of Java/Scala.
 ```text
 +-------------+       +-----------+       +---------------------+       +-------------+       +-------------+
 |             |       |           |       |                     |       |             |       |             |
-| producer.py | ----> |   Kafka   | ----> | flink_consumer.py   | ----> | ClickHouse  | ----> |   Web App   |
+| stock_producer.py | ----> |   Kafka   | ----> | flink_consumer.py   | ----> | ClickHouse  | ----> |   Web App   |
 |             | send  |           | read  |                     | write |             | query |  (FastAPI)  |
 +-------------+       +-----------+       +---------------------+       +-------------+       +-------------+
       |                     |                      |                          |                     |
@@ -71,7 +71,7 @@ PyFlink lets you write Flink applications in Python instead of Java/Scala.
 The producer generates fake stock ticks and sends them to Kafka:
 
 ```text
-producer.py
+stock_producer.py
     |
     |  {"symbol": "AAPL", "price": 150.50, "volume": 1000, "timestamp": "..."}
     |
@@ -254,7 +254,7 @@ ORDER BY (symbol, timestamp);
 
 ```bash
 # Terminal 1: Producer
-python src/producer/producer.py
+python src/producer/stock_producer.py
 
 # Terminal 2: Flink Consumer
 python src/consumer/flink_clickhouse_consumer.py

@@ -105,7 +105,7 @@ const latest = await fetch(`/api/latest?symbols=${SYMBOLS_PARAM}`);
 
 | Component | Stock Dashboard | Crypto Dashboard |
 |-----------|-----------------|------------------|
-| **Producer** | `producer.py` (synthetic) | `crypto_producer.py` (Coinbase) |
+| **Producer** | `stock_producer.py` (synthetic) | `crypto_producer.py` (Coinbase) |
 | **Data Source** | Random generated | Real Coinbase trades |
 | **Symbols** | AAPL, AMZN, GOOGL, META, MSFT | BTC, ETH, SOL, XRP, DOGE |
 | **Kafka Topic** | `stock-ticks` | `stock-ticks` (same) |

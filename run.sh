@@ -142,7 +142,7 @@ if [ "$DATA_SOURCE" == "crypto" ]; then
     echo -e "${GREEN}Crypto Producer started (PID: $PRODUCER_PID)${NC}\n"
 else
     echo -e "${YELLOW}Starting Synthetic Producer...${NC}"
-    python src/producer/producer.py &
+    python src/producer/stock_producer.py &
     PRODUCER_PID=$!
     echo -e "${GREEN}Synthetic Producer started (PID: $PRODUCER_PID)${NC}\n"
 fi
