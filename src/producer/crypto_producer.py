@@ -11,6 +11,7 @@ Usage:
 """
 
 import json
+import os
 import signal
 import sys
 from datetime import datetime, timezone
@@ -21,7 +22,8 @@ from kafka import KafkaProducer
 # CONFIGURATION
 # =============================================================================
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+# Use env var for Docker (kafka:29092) or default to localhost for local dev
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = "stock-ticks"  # Reuse same topic for compatibility
 
 # Crypto symbols to track (Coinbase product IDs)
