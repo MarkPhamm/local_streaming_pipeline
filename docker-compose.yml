@@ -27,7 +27,7 @@ services:
       # ============================================
       # We need TWO listeners:
       # - INTERNAL: for Docker containers (Spark) to connect
-      # - EXTERNAL: for your machine (producer.py) to connect
+      # - EXTERNAL: for your machine (stock_producer.py) to connect
 
       # Define all listeners Kafka will bind to
       # Format: LISTENER_NAME://HOST:PORT
@@ -60,6 +60,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # =============================================================================
+  # PRODUCER - Stock Data (Synthetic)
+  # =============================================================================
+  stock-producer:
+    build:
+      context: ./src/producer
+    container_name: stock-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    profiles:
+      - stock
+
+  # =============================================================================
+  # PRODUCER - Crypto Data (Real-time Coinbase)
+  # =============================================================================
+  crypto-producer:
+    build:
+      context: ./src/producer
+    container_name: crypto-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    command: ["python", "crypto_producer.py"]
+    profiles:
+      - crypto
 
   # =============================================================================
   # SPARK - Stream Processing

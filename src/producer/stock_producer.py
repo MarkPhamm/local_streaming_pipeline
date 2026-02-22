@@ -6,6 +6,7 @@ Think of it as simulating a stock market data feed.
 """
 
 import json
+import os
 import random
 import time
 from datetime import datetime
@@ -16,8 +17,9 @@ from kafka import KafkaProducer
 # CONFIGURATION
 # =============================================================================
 
-# Where Kafka is running (our Docker container exposes port 9092)
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+# Where Kafka is running
+# Use env var for Docker (kafka:29092) or default to localhost for local dev
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 
 # The topic we created earlier
 KAFKA_TOPIC = "stock-ticks"

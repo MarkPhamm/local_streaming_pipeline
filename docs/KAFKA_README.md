@@ -368,7 +368,7 @@ Use the console consumer to verify messages are being received.
 ```text
 Terminal 1 (producer)          Terminal 2 (consumer)
 
-python producer.py             kafka-console-consumer.sh
+python stock_producer.py             kafka-console-consumer.sh
     │                              │
     │  sends messages              │  reads messages
     ▼                              ▼

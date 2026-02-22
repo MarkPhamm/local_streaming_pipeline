@@ -153,7 +153,7 @@ value (bytes): b'{"symbol": "AAPL", "price": 150.5, ...}'
 ```text
 +-------------+       +-----------+       +------------------+
 |             |       |           |       |                  |
-| producer.py | ----> |   Kafka   | ----> | spark_consumer.py|
+| stock_producer.py | ----> |   Kafka   | ----> | spark_consumer.py|
 |             | send  |           | read  |                  |
 +-------------+       +-----------+       +------------------+
       |                     |                     |
@@ -185,7 +185,7 @@ docker-compose.yml
 Your Machine                         Docker
 +------------------+                +------------------+
 |                  |                |                  |
-| producer.py      | -------------> | Kafka container  |
+| stock_producer.py      | -------------> | Kafka container  |
 | (runs locally)   |    send        | (port 9092)      |
 |                  |                |                  |
 +------------------+                +--------+---------+
@@ -214,7 +214,7 @@ Kafka needs **two listeners** because of how Docker networking works.
 **The Problem:**
 
 ```text
-producer.py -----> localhost:9092 -----> Kafka    ✅ Works
+stock_producer.py -----> localhost:9092 -----> Kafka    ✅ Works
 (your machine)
 
 Spark container --> localhost:9092 --> ???        ❌ Fails!
@@ -248,7 +248,7 @@ Port 29092 = for connections from other Docker containers (internal)
                                   +---------------+
                                   | Your Machine  |
                                   |               |
-                                  | producer.py   |
+                                  | stock_producer.py   |
                                   | localhost:9092|
                                   +---------------+
 ```
@@ -257,7 +257,7 @@ Port 29092 = for connections from other Docker containers (internal)
 
 | Running from | Connect to |
 | ------------ | ---------- |
-| Your machine (producer.py) | `localhost:9092` |
+| Your machine (stock_producer.py) | `localhost:9092` |
 | Docker container (Spark) | `kafka:29092` |
 
 Both ports go to the same Kafka broker - just different "doors".
