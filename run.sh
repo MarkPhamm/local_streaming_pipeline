@@ -120,19 +120,47 @@ fi
 echo "=============================================="
 echo -e "${NC}"
 
-# Check if Docker containers are running
+# Start Docker containers if not running
 echo -e "${YELLOW}Checking Docker containers...${NC}"
-if ! docker ps | grep -q kafka; then
-    echo -e "${RED}Error: Kafka container not running. Start with: docker compose up -d${NC}"
-    exit 1
+if ! docker ps | grep -q kafka || ! docker ps | grep -q clickhouse; then
+    echo -e "${YELLOW}Starting Kafka and ClickHouse...${NC}"
+    docker compose up -d kafka clickhouse
+
+    echo -e "${YELLOW}Waiting for Kafka to be ready...${NC}"
+    until docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list 2>/dev/null; do
+        sleep 2
+    done
+    echo -e "${GREEN}Kafka is ready.${NC}"
+
+    echo -e "${YELLOW}Waiting for ClickHouse to be ready...${NC}"
+    until docker exec clickhouse clickhouse-client --query "SELECT 1" 2>/dev/null; do
+        sleep 2
+    done
+    echo -e "${GREEN}ClickHouse is ready.${NC}"
+else
+    echo -e "${GREEN}Docker containers are running.${NC}"
 fi
 
-if ! docker ps | grep -q clickhouse; then
-    echo -e "${RED}Error: ClickHouse container not running. Start with: docker compose up -d${NC}"
-    exit 1
-fi
+# Create Kafka topic (if not exists)
+echo -e "${YELLOW}Ensuring Kafka topic exists...${NC}"
+docker exec kafka /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server localhost:9092 \
+    --create --topic stock-ticks --partitions 1 --replication-factor 1 --if-not-exists 2>/dev/null
+echo -e "${GREEN}Kafka topic ready.${NC}"
 
-echo -e "${GREEN}Docker containers are running.${NC}\n"
+# Create ClickHouse database and table (if not exists)
+echo -e "${YELLOW}Ensuring ClickHouse tables exist...${NC}"
+docker exec clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS stocks"
+docker exec clickhouse clickhouse-client --query "
+    CREATE TABLE IF NOT EXISTS stocks.ticks (
+        symbol String,
+        price Float64,
+        volume UInt32,
+        timestamp DateTime64(6)
+    ) ENGINE = MergeTree()
+    ORDER BY (symbol, timestamp)
+"
+echo -e "${GREEN}ClickHouse tables ready.${NC}\n"
 
 # Start Producer
 if [ "$DATA_SOURCE" == "crypto" ]; then
