@@ -1,0 +1,86 @@
+image:
+  file: .gitpod.Dockerfile
+
+tasks:
+  - name: Infrastructure
+    init: |
+      # Install Python dependencies
+      uv venv && source .venv/bin/activate
+      uv pip install -r requirements.txt
+    command: |
+      # Start Kafka and ClickHouse
+      docker-compose up -d kafka clickhouse
+
+      # Wait for Kafka to be healthy
+      echo "Waiting for Kafka to be ready..."
+      until docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list 2>/dev/null; do
+        sleep 2
+      done
+      echo "Kafka is ready!"
+
+      # Create Kafka topic
+      docker exec kafka /opt/kafka/bin/kafka-topics.sh \
+        --bootstrap-server localhost:9092 \
+        --create --topic stock-ticks --partitions 1 --replication-factor 1 --if-not-exists
+
+      # Wait for ClickHouse to be healthy
+      echo "Waiting for ClickHouse to be ready..."
+      until docker exec clickhouse clickhouse-client --query "SELECT 1" 2>/dev/null; do
+        sleep 2
+      done
+      echo "ClickHouse is ready!"
+
+      # Create ClickHouse database and table
+      docker exec clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS stocks"
+      docker exec clickhouse clickhouse-client --query "
+        CREATE TABLE IF NOT EXISTS stocks.ticks (
+          symbol String,
+          price Float64,
+          volume UInt32,
+          timestamp DateTime64(6)
+        ) ENGINE = MergeTree()
+        ORDER BY (symbol, timestamp)
+      "
+      echo "Infrastructure is ready! Run the pipeline with: ./run.sh flink web --crypto"
+
+  - name: Pipeline
+    command: |
+      # Wait for infrastructure to be ready
+      echo "Waiting for infrastructure setup..."
+      until docker exec clickhouse clickhouse-client --query "SELECT 1" 2>/dev/null; do
+        sleep 3
+      done
+      source .venv/bin/activate
+      echo ""
+      echo "Ready! Start the pipeline with one of these commands:"
+      echo ""
+      echo "  ./run.sh                        # Spark + Synthetic Stocks + Streamlit"
+      echo "  ./run.sh flink web --crypto      # Flink + Real Crypto + Web Dashboard"
+      echo "  ./run.sh spark web               # Spark + Synthetic + Web Dashboard"
+      echo ""
+
+ports:
+  - port: 8501
+    onOpen: ignore
+    visibility: public
+    name: Streamlit Dashboard
+  - port: 8502
+    onOpen: open-preview
+    visibility: public
+    name: Web Dashboard
+  - port: 9092
+    onOpen: ignore
+    visibility: private
+    name: Kafka
+  - port: 8123
+    onOpen: ignore
+    visibility: private
+    name: ClickHouse HTTP
+  - port: 9000
+    onOpen: ignore
+    visibility: private
+    name: ClickHouse Native
+
+vscode:
+  extensions:
+    - ms-python.python
