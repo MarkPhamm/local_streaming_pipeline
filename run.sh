@@ -5,13 +5,17 @@
 # All components run via docker compose with profiles.
 #
 # Usage:
-#   ./run.sh                         # Default: synthetic + Spark micro-batch
-#   ./run.sh spark                   # Spark (micro-batch)
-#   ./run.sh spark streaming         # Spark (streaming + windowed aggs)
-#   ./run.sh flink                   # Flink (true streaming)
-#   ./run.sh --crypto                # Use real crypto data (Coinbase)
-#   ./run.sh spark streaming --crypto # Spark streaming + crypto
-#   ./run.sh flink --crypto          # Flink + crypto
+#   ./run.sh                         # Default: synthetic + Spark micro-batch + Streamlit
+#   ./run.sh spark                   # Spark (micro-batch) + Streamlit
+#   ./run.sh spark streaming         # Spark (streaming + windowed aggs) + Streamlit
+#   ./run.sh spark web               # Spark + Web dashboard
+#   ./run.sh flink                   # Flink + Streamlit
+#   ./run.sh flink web               # Flink + Web dashboard
+#   ./run.sh --crypto                # Crypto (forces Web dashboard)
+#   ./run.sh spark streaming --crypto # Spark streaming + crypto + Web
+#   ./run.sh flink --crypto          # Flink + crypto + Web
+#
+# Note: --crypto always uses the Web dashboard (Streamlit can't render fast enough)
 # =============================================================================
 
 set -e
@@ -27,6 +31,7 @@ NC='\033[0m' # No Color
 # Default values
 CONSUMER_TYPE="spark"
 SPARK_MODE="microbatch"
+DASHBOARD_TYPE="streamlit"
 DATA_SOURCE="synthetic"
 
 # Parse arguments
@@ -38,6 +43,12 @@ for arg in "$@"; do
         flink)
             CONSUMER_TYPE="flink"
             ;;
+        streamlit)
+            DASHBOARD_TYPE="streamlit"
+            ;;
+        web)
+            DASHBOARD_TYPE="web"
+            ;;
         streaming)
             SPARK_MODE="streaming"
             ;;
@@ -48,16 +59,16 @@ for arg in "$@"; do
             DATA_SOURCE="synthetic"
             ;;
         --help|-h)
-            echo "Usage: ./run.sh [spark|flink] [streaming] [--crypto|--synthetic]"
+            echo "Usage: ./run.sh [spark|flink] [streaming] [streamlit|web] [--crypto|--synthetic]"
             echo ""
             echo "Options:"
             echo "  spark       Use Spark Structured Streaming (micro-batch, default)"
             echo "  streaming   Use Spark with windowed aggregations + checkpointing"
             echo "  flink       Use Flink (true streaming)"
-            echo "  --crypto    Use real-time crypto data from Coinbase"
+            echo "  streamlit   Use Streamlit dashboard (port 8501, default)"
+            echo "  web         Use FastAPI web dashboard (port 8502)"
+            echo "  --crypto    Use real-time crypto data (forces web dashboard)"
             echo "  --synthetic Use synthetic stock data (default)"
-            echo ""
-            echo "Dashboard runs at http://localhost:8502"
             exit 0
             ;;
     esac
@@ -82,8 +93,14 @@ else
     PROFILES="$PROFILES --profile flink"
 fi
 
-# Dashboard profile (always included)
-PROFILES="$PROFILES --profile dashboard"
+# Crypto forces web dashboard (Streamlit can't render fast enough)
+if [ "$DATA_SOURCE" == "crypto" ] && [ "$DASHBOARD_TYPE" == "streamlit" ]; then
+    echo -e "${YELLOW}Note: Crypto mode uses the Web dashboard (Streamlit can't keep up with real-time data)${NC}"
+    DASHBOARD_TYPE="web"
+fi
+
+# Dashboard profile
+PROFILES="$PROFILES --profile $DASHBOARD_TYPE"
 
 # Cleanup function
 cleanup() {
@@ -110,7 +127,11 @@ else
     echo "  Kafka -> Flink -> ClickHouse"
     echo "  (true streaming)"
 fi
-echo "  Dashboard: http://localhost:8502"
+if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
+    echo "  Dashboard: Streamlit (http://localhost:8501)"
+else
+    echo "  Dashboard: Web/FastAPI (http://localhost:8502)"
+fi
 if [ "$DATA_SOURCE" == "crypto" ]; then
     echo -e "  Data: ${CYAN}Real-time Crypto (Coinbase)${GREEN}"
 else
