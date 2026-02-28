@@ -37,7 +37,9 @@ The pipeline supports 4 configurations combining **processing engine** and **dat
 | Option | Data Source | Processing | Command |
 |--------|-------------|------------|---------|
 | **Spark + Stocks** | Synthetic stock prices | Micro-batch (3s) | `./run.sh spark web` |
+| **Spark Streaming + Stocks** | Synthetic stock prices | Windowed aggs + checkpoints | `./run.sh spark streaming web` |
 | **Spark + Crypto** | Real-time Coinbase | Micro-batch (3s) | `./run.sh spark web --crypto` |
+| **Spark Streaming + Crypto** | Real-time Coinbase | Windowed aggs + checkpoints | `./run.sh spark streaming web --crypto` |
 | **Flink + Stocks** | Synthetic stock prices | True streaming | `./run.sh flink web` |
 | **Flink + Crypto** | Real-time Coinbase | True streaming | `./run.sh flink web --crypto` |
 
@@ -53,6 +55,7 @@ The pipeline supports 4 configurations combining **processing engine** and **dat
 | Engine | Model | Latency | Best For |
 |--------|-------|---------|----------|
 | **Spark** | Micro-batch (every 3 seconds) | Seconds | Batch + streaming, ML pipelines |
+| **Spark Streaming** | Windowed aggregations + checkpoints | Seconds | Event-time processing, VWAP |
 | **Flink** | True streaming (per record) | Milliseconds | Real-time dashboards, alerts |
 
 ### Dashboard Options
@@ -67,6 +70,9 @@ The pipeline supports 4 configurations combining **processing engine** and **dat
 ```bash
 # Default: Spark + Synthetic + Streamlit
 ./run.sh
+
+# Spark Streaming with windowed aggregations + Web dashboard
+./run.sh spark streaming web
 
 # Flink with real crypto data and web dashboard
 ./run.sh flink web --crypto
@@ -83,12 +89,12 @@ The pipeline supports 4 configurations combining **processing engine** and **dat
 ```text
 +-------------------+       +-----------+       +-------------------+       +-------------+       +-------------+
 |                   |       |           |       |                   |       |             |       |             |
-| stock_producer.py       | ----> |   Kafka   | ----> | Spark/Flink       | ----> | ClickHouse  | ----> | Dashboard   |
-| (synthetic)       |       |           |       | Consumer          |       |             |       | (FastAPI)   |
-|        OR         |       |           |       |                   |       |             |       |             |
-| crypto_stock_producer.py|       |           |       | spark_clickhouse  |       |             |       |             |
-| (Coinbase)        |       |           |       |       OR          |       |             |       |             |
-|                   |       |           |       | flink_clickhouse  |       |             |       |             |
+| stock_producer_demo  | ----> |   Kafka   | ----> | Spark/Flink       | ----> | ClickHouse  | ----> | Dashboard   |
+| (synthetic demo)     |       |           |       | Consumer          |       |             |       | (FastAPI)   |
+|        OR            |       |           |       |                   |       |             |       |             |
+| crypto_producer      |       |           |       | spark_microbatch  |       |             |       |             |
+| (Coinbase)           |       |           |       | spark_streaming   |       |             |       |             |
+|                      |       |           |       | flink_clickhouse  |       |             |       |             |
 +-------------------+       +-----------+       +-------------------+       +-------------+       +-------------+
 ```
 
@@ -184,31 +190,34 @@ Press `Ctrl+C` to stop all services.
 **Terminal 1 - Producer:**
 
 ```bash
-# Synthetic stocks
-python src/producer/stock_producer.py
+# Synthetic stocks (demo)
+python src/demo/stock_producer_demo.py
 
-# OR Real crypto
-python src/producer/crypto_stock_producer.py
+# OR Real crypto (production)
+python src/production/producer/crypto_producer.py
 ```
 
 **Terminal 2 - Consumer:**
 
 ```bash
 # Flink (true streaming)
-python src/consumer/flink_clickhouse_consumer.py
+python src/production/consumer/flink_clickhouse_consumer.py
 
 # OR Spark (micro-batch)
-python src/consumer/spark_clickhouse_consumer.py
+python src/production/consumer/spark_microbatch_clickhouse_consumer.py
+
+# OR Spark (streaming with windowed aggregations)
+python src/production/consumer/spark_streaming_clickhouse_consumer.py
 ```
 
 **Terminal 3 - Dashboard:**
 
 ```bash
 # Web dashboard
-python src/dashboard/web_app.py
+python src/production/dashboard/web_app.py
 
 # OR Streamlit
-streamlit run src/dashboard/app.py
+streamlit run src/production/dashboard/app.py
 ```
 
 **Terminal 4 - Query ClickHouse (optional):**
@@ -237,19 +246,23 @@ local_streaming_pipeline/
 ├── run.sh                   # Pipeline runner script
 ├── lib/                     # Flink connector JARs
 ├── src/
-│   ├── producer/
-│   │   ├── stock_producer.py          # Synthetic stock data
-│   │   └── crypto_stock_producer.py   # Real-time Coinbase crypto
-│   ├── consumer/
-│   │   ├── spark_consumer.py              # Spark -> Console
-│   │   ├── spark_clickhouse_consumer.py   # Spark -> ClickHouse
-│   │   └── flink_clickhouse_consumer.py   # Flink -> ClickHouse
-│   └── dashboard/
-│       ├── app.py               # Streamlit dashboard
-│       ├── web_app.py           # FastAPI web dashboard
-│       └── static/
-│           ├── index.html       # Stock dashboard UI
-│           └── crypto_index.html # Crypto dashboard UI
+│   ├── demo/
+│   │   ├── spark_consumer_demo.py     # Spark -> Console (learning/demo)
+│   │   └── stock_producer_demo.py     # Synthetic stock data (demo)
+│   └── production/
+│       ├── consumer/
+│       │   ├── flink_clickhouse_consumer.py             # Flink -> ClickHouse
+│       │   ├── spark_microbatch_clickhouse_consumer.py  # Spark micro-batch -> ClickHouse
+│       │   └── spark_streaming_clickhouse_consumer.py   # Spark streaming (windowed aggs) -> ClickHouse
+│       ├── producer/
+│       │   ├── Dockerfile             # Producer container config
+│       │   └── crypto_producer.py     # Real-time Coinbase crypto
+│       └── dashboard/
+│           ├── app.py               # Streamlit dashboard
+│           ├── web_app.py           # FastAPI web dashboard
+│           └── static/
+│               ├── stock_index.html   # Stock dashboard UI
+│               └── crypto_index.html  # Crypto dashboard UI
 ├── docs/
 │   ├── KAFKA_README.md      # Kafka concepts & commands
 │   ├── PYSPARK_README.md    # PySpark streaming guide
@@ -264,6 +277,7 @@ local_streaming_pipeline/
 | ----- | ----------- |
 | [Kafka](docs/KAFKA_README.md) | Message broker concepts, topics, partitions, commands |
 | [PySpark](docs/PYSPARK_README.md) | Structured Streaming, micro-batching, Kafka integration |
+| [Spark Streaming](docs/SPARK_STREAMING_README.md) | Watermarks, windowed aggregations, checkpointing, VWAP |
 | [Flink](docs/FLINK_README.md) | True streaming, PyFlink, Kafka & ClickHouse integration |
 | [ClickHouse](docs/CLICKHOUSE_README.md) | Column storage, MergeTree engine, SQL queries |
 

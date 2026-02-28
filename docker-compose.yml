@@ -66,7 +66,7 @@ services:
   # =============================================================================
   stock-producer:
     build:
-      context: ./src/producer
+      context: ./src/production/producer
     container_name: stock-producer
     depends_on:
       kafka:
@@ -81,7 +81,7 @@ services:
   # =============================================================================
   crypto-producer:
     build:
-      context: ./src/producer
+      context: ./src/production/producer
     container_name: crypto-producer
     depends_on:
       kafka:

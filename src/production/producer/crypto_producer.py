@@ -7,7 +7,7 @@ No API key required - uses public Coinbase WebSocket API.
 Symbols: BTC, ETH, SOL, XRP, DOGE, LTC (vs USD)
 
 Usage:
-    python src/producer/crypto_producer.py
+    python src/production/producer/crypto_producer.py
 """
 
 import json

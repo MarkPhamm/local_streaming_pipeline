@@ -4,7 +4,7 @@ Stock Ticks Dashboard
 A Streamlit dashboard to visualize real-time stock data from ClickHouse.
 
 Run with:
-    streamlit run src/dashboard/app.py
+    streamlit run src/production/dashboard/app.py
 """
 
 import streamlit as st

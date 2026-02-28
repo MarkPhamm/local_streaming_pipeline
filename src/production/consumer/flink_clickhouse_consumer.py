@@ -14,7 +14,7 @@ Requirements:
     - clickhouse-connect for ClickHouse writes
 
 Usage:
-    python src/consumer/flink_clickhouse_consumer.py
+    python src/production/consumer/flink_clickhouse_consumer.py
 """
 
 import os

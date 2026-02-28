@@ -5,11 +5,11 @@ A simple FastAPI backend that serves the dashboard
 and provides API endpoints for ClickHouse data.
 
 Run with:
-    uvicorn src.dashboard.web_app:app --reload --port 8502
+    uvicorn src.production.dashboard.web_app:app --reload --port 8502
 
 Or:
-    python src/dashboard/web_app.py
-    python src/dashboard/web_app.py --crypto   # Crypto dashboard
+    python src/production/dashboard/web_app.py
+    python src/production/dashboard/web_app.py --crypto   # Crypto dashboard
 """
 
 import argparse
