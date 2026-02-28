@@ -149,24 +149,8 @@ services:
       - flink
 
   # =============================================================================
-  # DASHBOARDS
+  # DASHBOARD
   # =============================================================================
-
-  # Streamlit dashboard (port 8501)
-  streamlit:
-    build:
-      context: ./src/production/dashboard
-    container_name: streamlit
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-    environment:
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "8123"
-    ports:
-      - "8501:8501"
-    profiles:
-      - streamlit
 
   # FastAPI web dashboard (port 8502)
   web-dashboard:
@@ -184,7 +168,7 @@ services:
       - "8502:8502"
     command: ["python", "web_app.py"]
     profiles:
-      - web
+      - dashboard
 
   # =============================================================================
   # DEMO
