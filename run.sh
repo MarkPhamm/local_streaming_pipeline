@@ -6,11 +6,13 @@
 #
 # Usage:
 #   ./run.sh                         # Default: synthetic + Spark + Streamlit
-#   ./run.sh spark                   # Spark + Streamlit
+#   ./run.sh spark                   # Spark (micro-batch) + Streamlit
+#   ./run.sh spark streaming         # Spark (streaming + windowed aggs) + Streamlit
+#   ./run.sh spark streaming web     # Spark (streaming) + Web dashboard
 #   ./run.sh flink                   # Flink + Streamlit
 #   ./run.sh spark web               # Spark + Web dashboard
 #   ./run.sh flink web               # Flink + Web dashboard
-#   ./run.sh --crypto                # Use real crypto data (Binance)
+#   ./run.sh --crypto                # Use real crypto data (Coinbase)
 #   ./run.sh flink web --crypto      # Flink + Web + real crypto data
 # =============================================================================
 
@@ -26,6 +28,7 @@ NC='\033[0m' # No Color
 
 # Default values
 CONSUMER_TYPE="spark"
+SPARK_MODE="microbatch"
 DASHBOARD_TYPE="streamlit"
 DATA_SOURCE="synthetic"
 
@@ -44,6 +47,9 @@ for arg in "$@"; do
         web)
             DASHBOARD_TYPE="web"
             ;;
+        streaming)
+            SPARK_MODE="streaming"
+            ;;
         --crypto|crypto)
             DATA_SOURCE="crypto"
             ;;
@@ -51,10 +57,11 @@ for arg in "$@"; do
             DATA_SOURCE="synthetic"
             ;;
         --help|-h)
-            echo "Usage: ./run.sh [spark|flink] [streamlit|web] [--crypto|--synthetic]"
+            echo "Usage: ./run.sh [spark|flink] [streaming] [streamlit|web] [--crypto|--synthetic]"
             echo ""
             echo "Options:"
-            echo "  spark       Use Spark Structured Streaming (micro-batch)"
+            echo "  spark       Use Spark Structured Streaming (micro-batch, default)"
+            echo "  streaming   Use Spark with windowed aggregations + checkpointing"
             echo "  flink       Use Flink (true streaming)"
             echo "  streamlit   Use Streamlit dashboard (port 8501)"
             echo "  web         Use FastAPI web dashboard (port 8502)"
@@ -100,7 +107,10 @@ trap cleanup SIGINT SIGTERM
 echo -e "${GREEN}"
 echo "=============================================="
 echo "  Local Streaming Pipeline"
-if [ "$CONSUMER_TYPE" == "spark" ]; then
+if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
+    echo "  Kafka -> Spark -> ClickHouse"
+    echo "  (streaming + windowed aggregations)"
+elif [ "$CONSUMER_TYPE" == "spark" ]; then
     echo "  Kafka -> Spark -> ClickHouse"
     echo "  (micro-batch processing)"
 else
@@ -160,17 +170,31 @@ docker exec clickhouse clickhouse-client --query "
     ) ENGINE = MergeTree()
     ORDER BY (symbol, timestamp)
 "
+docker exec clickhouse clickhouse-client --query "
+    CREATE TABLE IF NOT EXISTS stocks.ticks_1m_agg (
+        symbol String,
+        window_start DateTime64(6),
+        window_end DateTime64(6),
+        vwap Float64,
+        avg_price Float64,
+        min_price Float64,
+        max_price Float64,
+        total_volume UInt64,
+        tick_count UInt32
+    ) ENGINE = ReplacingMergeTree()
+    ORDER BY (symbol, window_start)
+"
 echo -e "${GREEN}ClickHouse tables ready.${NC}\n"
 
 # Start Producer
 if [ "$DATA_SOURCE" == "crypto" ]; then
     echo -e "${YELLOW}Starting Crypto Producer (Coinbase WebSocket)...${NC}"
-    python src/producer/crypto_producer.py &
+    python src/production/producer/crypto_producer.py &
     PRODUCER_PID=$!
     echo -e "${GREEN}Crypto Producer started (PID: $PRODUCER_PID)${NC}\n"
 else
     echo -e "${YELLOW}Starting Synthetic Producer...${NC}"
-    python src/producer/stock_producer.py &
+    python src/demo/stock_producer_demo.py &
     PRODUCER_PID=$!
     echo -e "${GREEN}Synthetic Producer started (PID: $PRODUCER_PID)${NC}\n"
 fi
@@ -179,16 +203,23 @@ fi
 sleep 2
 
 # Start Consumer (Spark or Flink)
-if [ "$CONSUMER_TYPE" == "spark" ]; then
+if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
+    echo -e "${YELLOW}Starting Spark Streaming Consumer (windowed aggregations)...${NC}"
+    python src/production/consumer/spark_streaming_clickhouse_consumer.py &
+    CONSUMER_PID=$!
+    echo -e "${GREEN}Spark Streaming Consumer started (PID: $CONSUMER_PID)${NC}\n"
+    # Wait for Spark to initialize
+    sleep 5
+elif [ "$CONSUMER_TYPE" == "spark" ]; then
     echo -e "${YELLOW}Starting Spark Consumer (micro-batch)...${NC}"
-    python src/consumer/spark_clickhouse_consumer.py &
+    python src/production/consumer/spark_microbatch_clickhouse_consumer.py &
     CONSUMER_PID=$!
     echo -e "${GREEN}Spark Consumer started (PID: $CONSUMER_PID)${NC}\n"
     # Wait for Spark to initialize
     sleep 5
 else
     echo -e "${YELLOW}Starting Flink Consumer (true streaming)...${NC}"
-    python src/consumer/flink_clickhouse_consumer.py &
+    python src/production/consumer/flink_clickhouse_consumer.py &
     CONSUMER_PID=$!
     echo -e "${GREEN}Flink Consumer started (PID: $CONSUMER_PID)${NC}\n"
     # Wait for Flink to initialize
@@ -198,17 +229,17 @@ fi
 # Start Dashboard (Streamlit or Web)
 if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
     echo -e "${YELLOW}Starting Streamlit Dashboard...${NC}"
-    streamlit run src/dashboard/app.py --server.headless true &
+    streamlit run src/production/dashboard/app.py --server.headless true &
     DASHBOARD_PID=$!
     DASHBOARD_URL="http://localhost:8501"
     echo -e "${GREEN}Streamlit started (PID: $DASHBOARD_PID)${NC}\n"
 else
     if [ "$DATA_SOURCE" == "crypto" ]; then
         echo -e "${YELLOW}Starting Crypto Web Dashboard (FastAPI)...${NC}"
-        python src/dashboard/web_app.py --crypto &
+        python src/production/dashboard/web_app.py --crypto &
     else
         echo -e "${YELLOW}Starting Stock Web Dashboard (FastAPI)...${NC}"
-        python src/dashboard/web_app.py &
+        python src/production/dashboard/web_app.py &
     fi
     DASHBOARD_PID=$!
     DASHBOARD_URL="http://localhost:8502"
@@ -225,8 +256,10 @@ if [ "$DATA_SOURCE" == "crypto" ]; then
 else
     echo -e "  Producer:   PID $PRODUCER_PID ${BLUE}(Synthetic)${NC}"
 fi
-if [ "$CONSUMER_TYPE" == "spark" ]; then
-    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark)${NC}"
+if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
+    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark Streaming)${NC}"
+elif [ "$CONSUMER_TYPE" == "spark" ]; then
+    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark Micro-batch)${NC}"
 else
     echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Flink)${NC}"
 fi

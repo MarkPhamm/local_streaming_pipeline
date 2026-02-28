@@ -9,7 +9,7 @@ It runs inside the Spark Docker container.
 Usage:
     /opt/spark/bin/spark-submit \
         --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.6.0,org.apache.httpcomponents.client5:httpclient5:5.3.1 \
-        /app/src/consumer/spark_clickhouse_consumer.py
+        /app/src/production/consumer/spark_microbatch_clickhouse_consumer.py
 """
 
 from pyspark.sql import SparkSession

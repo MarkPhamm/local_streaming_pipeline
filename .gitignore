@@ -201,6 +201,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Spark Streaming checkpoints
+checkpoints/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
