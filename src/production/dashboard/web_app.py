@@ -30,8 +30,8 @@ parser.add_argument("--crypto", action="store_true", help="Use crypto dashboard"
 parser.add_argument("--port", type=int, default=8502, help="Port to run on")
 args, _ = parser.parse_known_args()
 
-# Dashboard mode
-DASHBOARD_MODE = "crypto" if args.crypto else "stock"
+# Dashboard mode (env var overrides CLI flag for Docker)
+DASHBOARD_MODE = os.environ.get("DASHBOARD_MODE", "crypto" if args.crypto else "stock")
 
 # =============================================================================
 # CLICKHOUSE CONNECTION
@@ -45,8 +45,8 @@ def get_client():
     global client
     if client is None:
         client = clickhouse_connect.get_client(
-            host="localhost",
-            port=8123,
+            host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
+            port=int(os.environ.get("CLICKHOUSE_PORT", "8123")),
             database="stocks",
         )
     return client

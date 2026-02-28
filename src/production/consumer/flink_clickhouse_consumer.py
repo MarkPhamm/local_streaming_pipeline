@@ -31,21 +31,21 @@ from pyflink.datastream.functions import MapFunction, RuntimeContext
 # CONFIGURATION
 # =============================================================================
 
-# Get project root directory (two levels up from this script)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Get project root directory (three levels up from this script: consumer -> production -> src -> root)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 LIB_DIR = os.path.join(PROJECT_ROOT, "lib")
 
 # Connector JARs required for Kafka
 KAFKA_JAR = f"file://{LIB_DIR}/flink-sql-connector-kafka-3.2.0-1.19.jar"
 
 # Kafka connection (localhost when running on host machine)
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = "stock-ticks"
 KAFKA_GROUP_ID = "flink-clickhouse-consumer"
 
 # ClickHouse connection
-CLICKHOUSE_HOST = "localhost"
-CLICKHOUSE_PORT = 8123
+CLICKHOUSE_HOST = os.environ.get("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_PORT = int(os.environ.get("CLICKHOUSE_PORT", "8123"))
 CLICKHOUSE_DATABASE = "stocks"
 CLICKHOUSE_TABLE = "ticks"
 

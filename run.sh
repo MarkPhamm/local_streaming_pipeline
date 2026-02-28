@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # =============================================================================
-# Local Streaming Pipeline Runner
-# Starts: Producer -> Consumer (Spark or Flink) -> Dashboard (Streamlit or Web)
+# Local Streaming Pipeline Runner (Fully Containerized)
+# All components run via docker compose with profiles.
 #
 # Usage:
-#   ./run.sh                         # Default: synthetic + Spark + Streamlit
+#   ./run.sh                         # Default: synthetic + Spark micro-batch + Streamlit
 #   ./run.sh spark                   # Spark (micro-batch) + Streamlit
 #   ./run.sh spark streaming         # Spark (streaming + windowed aggs) + Streamlit
 #   ./run.sh spark streaming web     # Spark (streaming) + Web dashboard
@@ -72,31 +72,38 @@ for arg in "$@"; do
     esac
 done
 
-# PIDs for cleanup
-PRODUCER_PID=""
-CONSUMER_PID=""
-DASHBOARD_PID=""
+# Build profile flags
+PROFILES=""
+
+# Producer profile
+if [ "$DATA_SOURCE" == "crypto" ]; then
+    PROFILES="$PROFILES --profile crypto"
+else
+    PROFILES="$PROFILES --profile synthetic"
+fi
+
+# Consumer profile
+if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
+    PROFILES="$PROFILES --profile spark-streaming"
+elif [ "$CONSUMER_TYPE" == "spark" ]; then
+    PROFILES="$PROFILES --profile spark-microbatch"
+else
+    PROFILES="$PROFILES --profile flink"
+fi
+
+# Dashboard profile
+PROFILES="$PROFILES --profile $DASHBOARD_TYPE"
+
+# Set DASHBOARD_MODE for web dashboard when using crypto
+if [ "$DASHBOARD_TYPE" == "web" ] && [ "$DATA_SOURCE" == "crypto" ]; then
+    export COMPOSE_DASHBOARD_MODE="crypto"
+fi
 
 # Cleanup function
 cleanup() {
-    echo -e "\n${YELLOW}Shutting down...${NC}"
-
-    if [ -n "$DASHBOARD_PID" ]; then
-        echo "Stopping $DASHBOARD_TYPE dashboard (PID: $DASHBOARD_PID)"
-        kill $DASHBOARD_PID 2>/dev/null || true
-    fi
-
-    if [ -n "$CONSUMER_PID" ]; then
-        echo "Stopping $CONSUMER_TYPE consumer (PID: $CONSUMER_PID)"
-        kill $CONSUMER_PID 2>/dev/null || true
-    fi
-
-    if [ -n "$PRODUCER_PID" ]; then
-        echo "Stopping producer (PID: $PRODUCER_PID)"
-        kill $PRODUCER_PID 2>/dev/null || true
-    fi
-
-    echo -e "${GREEN}All processes stopped.${NC}"
+    echo -e "\n${YELLOW}Shutting down all containers...${NC}"
+    docker compose $PROFILES down
+    echo -e "${GREEN}All containers stopped.${NC}"
     exit 0
 }
 
@@ -106,7 +113,7 @@ trap cleanup SIGINT SIGTERM
 # Print banner
 echo -e "${GREEN}"
 echo "=============================================="
-echo "  Local Streaming Pipeline"
+echo "  Local Streaming Pipeline (Containerized)"
 if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
     echo "  Kafka -> Spark -> ClickHouse"
     echo "  (streaming + windowed aggregations)"
@@ -130,26 +137,21 @@ fi
 echo "=============================================="
 echo -e "${NC}"
 
-# Start Docker containers if not running
-echo -e "${YELLOW}Checking Docker containers...${NC}"
-if ! docker ps | grep -q kafka || ! docker ps | grep -q clickhouse; then
-    echo -e "${YELLOW}Starting Kafka and ClickHouse...${NC}"
-    docker compose up -d kafka clickhouse
+# Start infrastructure and wait for health
+echo -e "${YELLOW}Starting infrastructure (Kafka + ClickHouse)...${NC}"
+docker compose up -d kafka clickhouse
 
-    echo -e "${YELLOW}Waiting for Kafka to be ready...${NC}"
-    until docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list 2>/dev/null; do
-        sleep 2
-    done
-    echo -e "${GREEN}Kafka is ready.${NC}"
+echo -e "${YELLOW}Waiting for Kafka to be ready...${NC}"
+until docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list 2>/dev/null; do
+    sleep 2
+done
+echo -e "${GREEN}Kafka is ready.${NC}"
 
-    echo -e "${YELLOW}Waiting for ClickHouse to be ready...${NC}"
-    until docker exec clickhouse clickhouse-client --query "SELECT 1" 2>/dev/null; do
-        sleep 2
-    done
-    echo -e "${GREEN}ClickHouse is ready.${NC}"
-else
-    echo -e "${GREEN}Docker containers are running.${NC}"
-fi
+echo -e "${YELLOW}Waiting for ClickHouse to be ready...${NC}"
+until docker exec clickhouse clickhouse-client --query "SELECT 1" 2>/dev/null; do
+    sleep 2
+done
+echo -e "${GREEN}ClickHouse is ready.${NC}"
 
 # Create Kafka topic (if not exists)
 echo -e "${YELLOW}Ensuring Kafka topic exists...${NC}"
@@ -158,7 +160,7 @@ docker exec kafka /opt/kafka/bin/kafka-topics.sh \
     --create --topic stock-ticks --partitions 1 --replication-factor 1 --if-not-exists 2>/dev/null
 echo -e "${GREEN}Kafka topic ready.${NC}"
 
-# Create ClickHouse database and table (if not exists)
+# Create ClickHouse database and tables (if not exists)
 echo -e "${YELLOW}Ensuring ClickHouse tables exist...${NC}"
 docker exec clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS stocks"
 docker exec clickhouse clickhouse-client --query "
@@ -186,93 +188,15 @@ docker exec clickhouse clickhouse-client --query "
 "
 echo -e "${GREEN}ClickHouse tables ready.${NC}\n"
 
-# Start Producer
-if [ "$DATA_SOURCE" == "crypto" ]; then
-    echo -e "${YELLOW}Starting Crypto Producer (Coinbase WebSocket)...${NC}"
-    python src/production/producer/crypto_producer.py &
-    PRODUCER_PID=$!
-    echo -e "${GREEN}Crypto Producer started (PID: $PRODUCER_PID)${NC}\n"
-else
-    echo -e "${YELLOW}Starting Synthetic Producer...${NC}"
-    python src/demo/stock_producer_demo.py &
-    PRODUCER_PID=$!
-    echo -e "${GREEN}Synthetic Producer started (PID: $PRODUCER_PID)${NC}\n"
+# Override DASHBOARD_MODE for crypto web dashboard
+if [ "$DASHBOARD_TYPE" == "web" ] && [ "$DATA_SOURCE" == "crypto" ]; then
+    export DASHBOARD_MODE=crypto
 fi
 
-# Wait a moment for producer to start sending data
-sleep 2
-
-# Start Consumer (Spark or Flink)
-if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
-    echo -e "${YELLOW}Starting Spark Streaming Consumer (windowed aggregations)...${NC}"
-    python src/production/consumer/spark_streaming_clickhouse_consumer.py &
-    CONSUMER_PID=$!
-    echo -e "${GREEN}Spark Streaming Consumer started (PID: $CONSUMER_PID)${NC}\n"
-    # Wait for Spark to initialize
-    sleep 5
-elif [ "$CONSUMER_TYPE" == "spark" ]; then
-    echo -e "${YELLOW}Starting Spark Consumer (micro-batch)...${NC}"
-    python src/production/consumer/spark_microbatch_clickhouse_consumer.py &
-    CONSUMER_PID=$!
-    echo -e "${GREEN}Spark Consumer started (PID: $CONSUMER_PID)${NC}\n"
-    # Wait for Spark to initialize
-    sleep 5
-else
-    echo -e "${YELLOW}Starting Flink Consumer (true streaming)...${NC}"
-    python src/production/consumer/flink_clickhouse_consumer.py &
-    CONSUMER_PID=$!
-    echo -e "${GREEN}Flink Consumer started (PID: $CONSUMER_PID)${NC}\n"
-    # Wait for Flink to initialize
-    sleep 3
-fi
-
-# Start Dashboard (Streamlit or Web)
-if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
-    echo -e "${YELLOW}Starting Streamlit Dashboard...${NC}"
-    streamlit run src/production/dashboard/app.py --server.headless true &
-    DASHBOARD_PID=$!
-    DASHBOARD_URL="http://localhost:8501"
-    echo -e "${GREEN}Streamlit started (PID: $DASHBOARD_PID)${NC}\n"
-else
-    if [ "$DATA_SOURCE" == "crypto" ]; then
-        echo -e "${YELLOW}Starting Crypto Web Dashboard (FastAPI)...${NC}"
-        python src/production/dashboard/web_app.py --crypto &
-    else
-        echo -e "${YELLOW}Starting Stock Web Dashboard (FastAPI)...${NC}"
-        python src/production/dashboard/web_app.py &
-    fi
-    DASHBOARD_PID=$!
-    DASHBOARD_URL="http://localhost:8502"
-    echo -e "${GREEN}Web dashboard started (PID: $DASHBOARD_PID)${NC}\n"
-fi
-
-# Print status
+# Start all profiled services (blocks and streams logs)
 echo -e "${GREEN}=============================================="
-echo "  All services running!"
-echo "=============================================="
-echo -e "${NC}"
-if [ "$DATA_SOURCE" == "crypto" ]; then
-    echo -e "  Producer:   PID $PRODUCER_PID ${CYAN}(Coinbase Crypto)${NC}"
-else
-    echo -e "  Producer:   PID $PRODUCER_PID ${BLUE}(Synthetic)${NC}"
-fi
-if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
-    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark Streaming)${NC}"
-elif [ "$CONSUMER_TYPE" == "spark" ]; then
-    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Spark Micro-batch)${NC}"
-else
-    echo -e "  Consumer:   PID $CONSUMER_PID ${BLUE}(Flink)${NC}"
-fi
-if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
-    echo -e "  Dashboard:  PID $DASHBOARD_PID ${BLUE}(Streamlit)${NC}"
-else
-    echo -e "  Dashboard:  PID $DASHBOARD_PID ${BLUE}(Web/FastAPI)${NC}"
-fi
-echo ""
-echo -e "  Dashboard:  ${GREEN}${DASHBOARD_URL}${NC}"
-echo ""
-echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
-echo ""
+echo "  Starting all services..."
+echo "==============================================\n${NC}"
+echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}\n"
 
-# Wait for all background processes
-wait
+docker compose $PROFILES up --build
