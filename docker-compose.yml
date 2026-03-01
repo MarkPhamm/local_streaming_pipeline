@@ -58,6 +58,7 @@ services:
   crypto-producer:
     build:
       context: ./src/production/producer
+      dockerfile: Dockerfile.crypto-producer
     container_name: crypto-producer
     depends_on:
       kafka:
@@ -75,7 +76,7 @@ services:
   spark-microbatch:
     build:
       context: ./src/production/consumer
-      dockerfile: Dockerfile.spark
+      dockerfile: Dockerfile.spark-consumer
     container_name: spark-microbatch
     depends_on:
       kafka:
@@ -93,7 +94,7 @@ services:
   spark-streaming:
     build:
       context: ./src/production/consumer
-      dockerfile: Dockerfile.spark
+      dockerfile: Dockerfile.spark-consumer
     container_name: spark-streaming
     depends_on:
       kafka:
@@ -119,7 +120,7 @@ services:
   flink-consumer:
     build:
       context: .
-      dockerfile: src/production/consumer/Dockerfile.flink
+      dockerfile: src/production/consumer/Dockerfile.flink-consumer
     container_name: flink-consumer
     depends_on:
       kafka:
@@ -140,6 +141,7 @@ services:
   web-dashboard:
     build:
       context: ./src/production/dashboard
+      dockerfile: Dockerfile.web-dashboard
     container_name: web-dashboard
     depends_on:
       clickhouse:
@@ -150,7 +152,6 @@ services:
       DASHBOARD_MODE: ${DASHBOARD_MODE:-crypto}
     ports:
       - "8502:8502"
-    command: ["python", "web_app.py"]
     profiles:
       - web
 

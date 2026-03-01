@@ -185,21 +185,20 @@ local_streaming_pipeline/
 │   │   └── stock_producer_demo.py          # Synthetic stock data producer
 │   └── production/
 │       ├── consumer/
-│       │   ├── Dockerfile.spark                           # Spark consumer container
-│       │   ├── Dockerfile.flink                           # Flink consumer container
+│       │   ├── Dockerfile.spark-consumer                  # Spark consumer container
+│       │   ├── Dockerfile.flink-consumer                  # Flink consumer container
 │       │   ├── flink_clickhouse_consumer.py               # Flink -> ClickHouse
 │       │   ├── spark_microbatch_clickhouse_consumer.py    # Spark micro-batch -> ClickHouse
 │       │   └── spark_streaming_clickhouse_consumer.py     # Spark streaming -> ClickHouse
 │       ├── producer/
-│       │   ├── Dockerfile              # Crypto producer container
-│       │   └── crypto_producer.py      # Real-time Coinbase WebSocket
+│       │   ├── Dockerfile.crypto-producer  # Crypto producer container
+│       │   └── crypto_producer.py          # Real-time Coinbase WebSocket
 │       └── dashboard/
-│           ├── Dockerfile              # Dashboard container (FastAPI)
-│           ├── app.py                  # Streamlit dashboard (local dev)
-│           ├── web_app.py              # FastAPI web dashboard
+│           ├── Dockerfile.web-dashboard  # FastAPI dashboard container
+│           ├── web_app.py               # FastAPI web dashboard
 │           └── static/
-│               ├── stock_index.html    # Stock dashboard UI
-│               └── crypto_index.html   # Crypto dashboard UI
+│               ├── stock_index.html     # Stock dashboard UI
+│               └── crypto_index.html    # Crypto dashboard UI
 ├── docs/
 │   ├── KAFKA_README.md         # Kafka concepts & commands
 │   ├── PYSPARK_README.md       # PySpark streaming guide

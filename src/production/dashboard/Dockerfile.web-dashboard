@@ -1,0 +1,15 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dashboard dependencies
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    clickhouse-connect
+
+# Copy dashboard files
+COPY web_app.py ./
+COPY static/ static/
+
+CMD ["python", "web_app.py"]
