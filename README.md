@@ -14,44 +14,34 @@ Producer --> Kafka --> Spark/Flink --> ClickHouse --> Dashboard
 ## Quick Start
 
 ```bash
-# Clone and run (Docker is the only prerequisite)
-./run.sh                           # Default: spark_microbatch + stock
-./run.sh spark_streaming crypto    # Spark streaming + real-time crypto
-./run.sh flink stock               # Flink + synthetic stocks
-```
+# Production: real-time crypto data (Docker is the only prerequisite)
+./run.sh                     # Default: spark_microbatch
+./run.sh spark_streaming     # Spark streaming with windowed aggregations
+./run.sh flink               # Flink true streaming
 
-The `run.sh` script handles everything: starts infrastructure, creates Kafka topics, sets up ClickHouse tables, and launches all services in Docker containers.
+# Demo: synthetic stocks -> Spark -> console (no ClickHouse, no dashboard)
+./run_demo.sh
+```
 
 Press `Ctrl+C` to stop all services.
 
-## Run Options
+## Production Pipeline
 
 ```text
-./run.sh <consumer> <data_source>
+./run.sh <consumer>
 ```
 
-| Arg | Options | Default |
-|-----|---------|---------|
-| **consumer** | `spark_microbatch`, `spark_streaming`, `flink` | `spark_microbatch` |
-| **data_source** | `stock`, `crypto` | `stock` |
+Runs the full production pipeline: **Coinbase crypto producer -> Kafka -> Consumer -> ClickHouse -> Web Dashboard (port 8502)**
 
-### All Combinations
+| Consumer | Processing Model | Command |
+|----------|-----------------|---------|
+| **spark_microbatch** | Micro-batch (every 3 seconds) | `./run.sh` or `./run.sh spark_microbatch` |
+| **spark_streaming** | Windowed aggregations + checkpoints | `./run.sh spark_streaming` |
+| **flink** | True streaming (per record) | `./run.sh flink` |
 
-| Consumer | Data Source | Producer | Dashboard | Command |
-|----------|------------|----------|-----------|---------|
-| **spark_microbatch** | stock | Synthetic stocks | Streamlit (8501) | `./run.sh` |
-| **spark_microbatch** | crypto | Coinbase WebSocket | Web/FastAPI (8502) | `./run.sh spark_microbatch crypto` |
-| **spark_streaming** | stock | Synthetic stocks | Streamlit (8501) | `./run.sh spark_streaming stock` |
-| **spark_streaming** | crypto | Coinbase WebSocket | Web/FastAPI (8502) | `./run.sh spark_streaming crypto` |
-| **flink** | stock | Synthetic stocks | Streamlit (8501) | `./run.sh flink stock` |
-| **flink** | crypto | Coinbase WebSocket | Web/FastAPI (8502) | `./run.sh flink crypto` |
-
-### Data Sources
-
-| Source | Description | Symbols | Dashboard |
-|--------|-------------|---------|-----------|
-| **stock** | Synthetic stock prices with volatile movements | AAPL, GOOGL, MSFT, AMZN, META | Streamlit (port 8501) |
-| **crypto** | Live prices from Coinbase WebSocket (no API key needed) | BTC, ETH, SOL, XRP, DOGE, LTC | Web/FastAPI (port 8502) |
+- **Data**: Real-time crypto prices from Coinbase WebSocket (BTC, ETH, SOL, XRP, DOGE, LTC)
+- **Dashboard**: Web/FastAPI at <http://localhost:8502>
+- **Compose file**: `docker-compose.yml`
 
 ### Processing Engines
 
@@ -61,20 +51,40 @@ Press `Ctrl+C` to stop all services.
 | **spark_streaming** | Windowed aggregations + checkpoints | Seconds | Event-time processing, VWAP |
 | **flink** | True streaming (per record) | Milliseconds | Real-time dashboards, alerts |
 
-## Architecture
+## Demo Pipeline
 
-```text
-+----------------------+     +-----------+     +-------------------+     +-------------+     +-------------+
-|                      |     |           |     |                   |     |             |     |             |
-| stock_producer_demo  | --> |   Kafka   | --> | spark_microbatch  | --> | ClickHouse  | --> | Streamlit   |
-| (synthetic, demo)    |     |           |     | spark_streaming   |     |             |     |   (8501)    |
-|         OR           |     |           |     | flink             |     |             |     |      OR     |
-| crypto_producer      |     |           |     |                   |     |             |     | Web/FastAPI |
-| (Coinbase, live)     |     |           |     |                   |     |             |     |   (8502)    |
-+----------------------+     +-----------+     +-------------------+     +-------------+     +-------------+
+```bash
+./run_demo.sh
 ```
 
-All components run as Docker containers orchestrated via `docker compose` profiles.
+Runs a minimal demo: **Synthetic stock producer -> Kafka -> Spark -> Console output**
+
+- **Data**: Randomly generated stock prices (AAPL, GOOGL, MSFT, AMZN, META)
+- **No ClickHouse, no dashboard** — just console output for learning
+- **Compose file**: `docker-compose.demo.yml`
+
+## Architecture
+
+### Production
+
+```text
++------------------+     +---------+     +-------------------+     +------------+     +-------------+
+|                  |     |         |     |                   |     |            |     |             |
+| crypto_producer  | --> |  Kafka  | --> | spark_microbatch  | --> | ClickHouse | --> | Web/FastAPI |
+| (Coinbase)       |     |         |     | spark_streaming   |     |            |     |   (8502)    |
+|                  |     |         |     | flink             |     |            |     |             |
++------------------+     +---------+     +-------------------+     +------------+     +-------------+
+```
+
+### Demo
+
+```text
++---------------------+     +---------+     +-------------+
+|                     |     |         |     |             |
+| stock_producer_demo | --> |  Kafka  | --> | Spark       |
+| (synthetic)         |     |         |     | (console)   |
++---------------------+     +---------+     +-------------+
+```
 
 ## Prerequisites
 
@@ -83,6 +93,7 @@ All components run as Docker containers orchestrated via `docker compose` profil
 That's it. Everything runs in containers.
 
 For **local development** (running scripts outside Docker), you also need:
+
 - Python 3.10+
 - Java 11+ (for Flink)
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
@@ -120,11 +131,11 @@ docker exec clickhouse clickhouse-client --query "
 **Terminal 1 - Producer:**
 
 ```bash
-# Synthetic stocks
-python src/demo/stock_producer_demo.py
-
-# OR Real crypto
+# Real crypto (production)
 python src/production/producer/crypto_producer.py
+
+# OR Synthetic stocks (demo)
+python src/demo/stock_producer_demo.py
 ```
 
 **Terminal 2 - Consumer:**
@@ -143,11 +154,7 @@ python src/production/consumer/flink_clickhouse_consumer.py
 **Terminal 3 - Dashboard:**
 
 ```bash
-# Web dashboard (FastAPI)
 python src/production/dashboard/web_app.py
-
-# OR Streamlit
-streamlit run src/production/dashboard/app.py
 ```
 
 **Terminal 4 - Query ClickHouse (optional):**
@@ -160,27 +167,22 @@ docker exec -it clickhouse clickhouse-client
 SELECT * FROM stocks.ticks ORDER BY timestamp DESC LIMIT 10;
 ```
 
-### Dashboard URLs
-
-| Dashboard | URL |
-|-----------|-----|
-| Streamlit | <http://localhost:8501> |
-| Web (FastAPI) | <http://localhost:8502> |
-
 ## Project Structure
 
 ```text
 local_streaming_pipeline/
-├── docker-compose.yml          # All services with Docker Compose profiles
-├── run.sh                      # Pipeline runner (two args: consumer + data_source)
-├── requirements.txt            # Python dependencies (local dev)
-├── lib/                        # Flink connector JARs
+├── docker-compose.yml              # Production services (crypto + consumers + dashboard)
+├── docker-compose.demo.yml         # Demo services (stock producer + Spark console)
+├── run.sh                          # Production runner (one arg: consumer type)
+├── run_demo.sh                     # Demo runner (no args)
+├── requirements.txt                # Python dependencies (local dev)
+├── lib/                            # Flink connector JARs
 ├── src/
 │   ├── demo/
-│   │   ├── Dockerfile                # Demo producer container
-│   │   ├── Dockerfile.spark-demo     # Demo Spark consumer container
-│   │   ├── spark_consumer_demo.py    # Spark -> Console (learning/demo)
-│   │   └── stock_producer_demo.py    # Synthetic stock data producer
+│   │   ├── Dockerfile.producer-demo        # Demo stock producer container
+│   │   ├── Dockerfile.spark-consumer-demo  # Demo Spark console consumer container
+│   │   ├── spark_consumer_demo.py          # Spark -> Console (learning/demo)
+│   │   └── stock_producer_demo.py          # Synthetic stock data producer
 │   └── production/
 │       ├── consumer/
 │       │   ├── Dockerfile.spark                           # Spark consumer container
@@ -192,8 +194,8 @@ local_streaming_pipeline/
 │       │   ├── Dockerfile              # Crypto producer container
 │       │   └── crypto_producer.py      # Real-time Coinbase WebSocket
 │       └── dashboard/
-│           ├── Dockerfile              # Dashboard container (Streamlit + FastAPI)
-│           ├── app.py                  # Streamlit dashboard
+│           ├── Dockerfile              # Dashboard container (FastAPI)
+│           ├── app.py                  # Streamlit dashboard (local dev)
 │           ├── web_app.py              # FastAPI web dashboard
 │           └── static/
 │               ├── stock_index.html    # Stock dashboard UI
@@ -235,7 +237,6 @@ docker compose down --remove-orphans
 ### Port already in use
 
 ```bash
-lsof -i :8501  # Streamlit
 lsof -i :8502  # Web dashboard
 lsof -i :9092  # Kafka
 ```
