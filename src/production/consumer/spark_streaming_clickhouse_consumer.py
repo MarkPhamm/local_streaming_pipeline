@@ -20,6 +20,8 @@ Usage:
     python src/production/consumer/spark_streaming_clickhouse_consumer.py
 """
 
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     from_json, col, to_timestamp, window, avg, min as spark_min,
@@ -31,11 +33,11 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, L
 # CONFIGURATION
 # =============================================================================
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = "stock-ticks"
 
-CLICKHOUSE_HOST = "localhost"
-CLICKHOUSE_PORT = "8123"
+CLICKHOUSE_HOST = os.environ.get("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_PORT = os.environ.get("CLICKHOUSE_PORT", "8123")
 CLICKHOUSE_DATABASE = "stocks"
 CLICKHOUSE_RAW_TABLE = "ticks"
 CLICKHOUSE_AGG_TABLE = "ticks_1m_agg"
@@ -52,8 +54,8 @@ WATERMARK_DELAY = "30 seconds"
 WINDOW_DURATION = "1 minute"
 
 # Checkpoint directories (one per stream for independent fault tolerance)
-CHECKPOINT_DIR_RAW = "checkpoints/raw_ticks"
-CHECKPOINT_DIR_AGG = "checkpoints/windowed_agg"
+CHECKPOINT_DIR_RAW = os.environ.get("CHECKPOINT_DIR_RAW", "checkpoints/raw_ticks")
+CHECKPOINT_DIR_AGG = os.environ.get("CHECKPOINT_DIR_AGG", "checkpoints/windowed_agg")
 
 # =============================================================================
 # CREATE SPARK SESSION

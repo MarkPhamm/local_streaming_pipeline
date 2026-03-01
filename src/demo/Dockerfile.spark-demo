@@ -1,0 +1,16 @@
+FROM apache/spark:3.5.0
+
+USER root
+
+WORKDIR /app
+
+# Pre-download Kafka Maven package into Ivy cache
+RUN /opt/spark/bin/spark-submit \
+    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+    /dev/null 2>/dev/null || true
+
+COPY spark_consumer_demo.py ./
+
+CMD ["/opt/spark/bin/spark-submit", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0", \
+     "spark_consumer_demo.py"]

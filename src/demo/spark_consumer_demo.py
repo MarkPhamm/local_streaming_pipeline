@@ -5,6 +5,8 @@ This script reads stock tick messages from Kafka using Spark Structured Streamin
 It runs inside the Spark Docker container.
 """
 
+import os
+
 from pyspark.sql import SparkSession
 
 # =============================================================================
@@ -12,7 +14,7 @@ from pyspark.sql import SparkSession
 # =============================================================================
 
 # Kafka connection (localhost when running on host machine)
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 
 # Topic to read from
 KAFKA_TOPIC = "stock-ticks"

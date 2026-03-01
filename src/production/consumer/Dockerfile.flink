@@ -1,0 +1,26 @@
+FROM python:3.12-slim
+
+# Install Java 17 (required by PyFlink)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openjdk-17-jre-headless && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME dynamically (works on both arm64 and amd64)
+RUN ln -s $(dirname $(dirname $(readlink -f $(which java)))) /usr/lib/jvm/java-current
+ENV JAVA_HOME=/usr/lib/jvm/java-current
+
+WORKDIR /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    apache-flink==1.20.0 \
+    clickhouse-connect \
+    kafka-python-ng==2.2.2 \
+    setuptools
+
+# Copy connector JAR and consumer script preserving directory structure
+# Build context must be project root for this Dockerfile
+COPY lib/ lib/
+COPY src/production/consumer/flink_clickhouse_consumer.py src/production/consumer/
+
+CMD ["python", "src/production/consumer/flink_clickhouse_consumer.py"]

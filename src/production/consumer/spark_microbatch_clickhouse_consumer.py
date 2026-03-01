@@ -12,6 +12,8 @@ Usage:
         /app/src/production/consumer/spark_microbatch_clickhouse_consumer.py
 """
 
+import os
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
@@ -21,12 +23,12 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, L
 # =============================================================================
 
 # Kafka connection (localhost when running on host machine)
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPIC = "stock-ticks"
 
 # ClickHouse connection (localhost when running on host machine)
-CLICKHOUSE_HOST = "localhost"
-CLICKHOUSE_PORT = "8123"
+CLICKHOUSE_HOST = os.environ.get("CLICKHOUSE_HOST", "localhost")
+CLICKHOUSE_PORT = os.environ.get("CLICKHOUSE_PORT", "8123")
 CLICKHOUSE_DATABASE = "stocks"
 CLICKHOUSE_TABLE = "ticks"
 

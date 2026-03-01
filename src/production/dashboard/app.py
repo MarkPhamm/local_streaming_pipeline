@@ -7,6 +7,8 @@ Run with:
     streamlit run src/production/dashboard/app.py
 """
 
+import os
+
 import streamlit as st
 import clickhouse_connect
 import pandas as pd
@@ -30,8 +32,8 @@ st.set_page_config(
 def get_client():
     """Create a ClickHouse client (cached so we reuse the connection)."""
     return clickhouse_connect.get_client(
-        host="localhost",
-        port=8123,
+        host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
+        port=int(os.environ.get("CLICKHOUSE_PORT", "8123")),
         database="stocks",
     )
 

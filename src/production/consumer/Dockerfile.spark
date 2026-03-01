@@ -1,0 +1,19 @@
+FROM apache/spark:3.5.0
+
+USER root
+
+WORKDIR /app
+
+# Pre-download Maven JARs (Kafka + ClickHouse JDBC) into Ivy cache
+# This avoids downloading on every spark-submit
+RUN /opt/spark/bin/spark-submit \
+    --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.6.0,org.apache.httpcomponents.client5:httpclient5:5.3.1 \
+    /dev/null 2>/dev/null || true
+
+# Copy both Spark consumer scripts
+COPY spark_microbatch_clickhouse_consumer.py spark_streaming_clickhouse_consumer.py ./
+
+# Default: run micro-batch consumer
+CMD ["/opt/spark/bin/spark-submit", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.6.0,org.apache.httpcomponents.client5:httpclient5:5.3.1", \
+     "spark_microbatch_clickhouse_consumer.py"]
