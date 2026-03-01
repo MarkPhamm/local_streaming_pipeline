@@ -1,16 +1,23 @@
+# Builds: spark-demo (profile: demo)
+# Demo Spark consumer that reads from Kafka and prints to console (no ClickHouse)
 FROM apache/spark:3.5.0
 
+# Switch to root user (Spark image defaults to a non-root user)
 USER root
 
+# Set /app as the working directory for all subsequent commands
 WORKDIR /app
 
-# Pre-download Kafka Maven package into Ivy cache
+# Pre-download the Kafka connector JAR into Ivy cache at build time
+# so spark-submit doesn't need to fetch it on every container start
 RUN /opt/spark/bin/spark-submit \
     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
     /dev/null 2>/dev/null || true
 
+# Copy the demo consumer script into the container
 COPY spark_consumer_demo.py ./
 
+# Run the consumer via spark-submit with the Kafka connector package
 CMD ["/opt/spark/bin/spark-submit", \
-     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0", \
-     "spark_consumer_demo.py"]
+    "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0", \
+    "spark_consumer_demo.py"]
