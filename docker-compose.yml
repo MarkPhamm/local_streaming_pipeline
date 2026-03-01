@@ -59,7 +59,7 @@ services:
   stock-producer:
     build:
       context: ./src/demo
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.producer-demo
     container_name: stock-producer
     depends_on:
       kafka:
@@ -194,7 +194,7 @@ services:
   spark-demo:
     build:
       context: ./src/demo
-      dockerfile: Dockerfile.spark-demo
+      dockerfile: Dockerfile.spark-consumer-demo
     container_name: spark-demo
     depends_on:
       kafka:
