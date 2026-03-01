@@ -16,12 +16,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-PROFILES="--profile stock --profile demo"
+COMPOSE="docker compose -f docker-compose.demo.yml"
 
 # Cleanup on Ctrl+C
 cleanup() {
     echo -e "\n${YELLOW}Shutting down all containers...${NC}"
-    docker compose $PROFILES down
+    $COMPOSE down
     echo -e "${GREEN}All containers stopped.${NC}"
     exit 0
 }
@@ -37,7 +37,7 @@ echo -e "${NC}"
 
 # Start Kafka and wait for health
 echo -e "${YELLOW}Starting Kafka...${NC}"
-docker compose up -d kafka
+$COMPOSE up -d kafka
 
 echo -e "${YELLOW}Waiting for Kafka to be ready...${NC}"
 until docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list 2>/dev/null; do
@@ -58,4 +58,4 @@ echo "  Starting demo services..."
 echo -e "==============================================\n${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}\n"
 
-docker compose $PROFILES up --build
+$COMPOSE up --build

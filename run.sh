@@ -1,26 +1,22 @@
 #!/bin/bash
 
 # =============================================================================
-# Local Streaming Pipeline Runner (Fully Containerized)
+# Production Pipeline Runner (Fully Containerized)
 #
-# Two arguments: CONSUMER and DATA_SOURCE
+# Runs: Crypto Producer (Coinbase) -> Kafka -> Consumer -> ClickHouse -> Web Dashboard
 #
 # Usage:
-#   ./run.sh <consumer> <data_source>
+#   ./run.sh <consumer>
 #
-#   consumer:    spark_microbatch (default) | spark_streaming | flink
-#   data_source: stock (default)           | crypto
+#   consumer: spark_microbatch (default) | spark_streaming | flink
 #
 # Examples:
-#   ./run.sh                              # spark_microbatch + stock
-#   ./run.sh spark_microbatch stock       # same as above
-#   ./run.sh spark_streaming stock        # spark streaming + stock
-#   ./run.sh spark_streaming crypto       # spark streaming + crypto
-#   ./run.sh flink stock                  # flink + stock
-#   ./run.sh flink crypto                 # flink + crypto
+#   ./run.sh                     # spark_microbatch
+#   ./run.sh spark_microbatch    # same as above
+#   ./run.sh spark_streaming     # spark streaming with windowed aggregations
+#   ./run.sh flink               # flink true streaming
 #
-# stock  = demo synthetic producer + Streamlit dashboard (port 8501)
-# crypto = production Coinbase producer + Web dashboard (port 8502)
+# For demo mode (synthetic stocks -> Spark -> console), use ./run_demo.sh
 # =============================================================================
 
 set -e
@@ -29,29 +25,25 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
 CONSUMER="${1:-spark_microbatch}"
-DATA_SOURCE="${2:-stock}"
 
 # Validate consumer
 case $CONSUMER in
     spark_microbatch|spark_streaming|flink)
         ;;
     --help|-h)
-        echo "Usage: ./run.sh <consumer> <data_source>"
+        echo "Usage: ./run.sh <consumer>"
         echo ""
         echo "Consumer (pick one):"
         echo "  spark_microbatch  Spark micro-batch processing (default)"
         echo "  spark_streaming   Spark streaming with windowed aggregations"
         echo "  flink             Flink true streaming"
         echo ""
-        echo "Data source (pick one):"
-        echo "  stock   Synthetic stock data + Streamlit dashboard (default)"
-        echo "  crypto  Real-time Coinbase crypto + Web dashboard"
+        echo "For demo mode (synthetic stocks), use: ./run_demo.sh"
         exit 0
         ;;
     *)
@@ -61,31 +53,9 @@ case $CONSUMER in
         ;;
 esac
 
-# Validate data source
-case $DATA_SOURCE in
-    stock|crypto)
-        ;;
-    *)
-        echo -e "${RED}Error: Unknown data source '$DATA_SOURCE'${NC}"
-        echo "Valid options: stock, crypto"
-        exit 1
-        ;;
-esac
-
-# Build profile flags based on consumer
-PROFILES="--profile $CONSUMER"
-
-# Data source determines producer + dashboard
-if [ "$DATA_SOURCE" == "crypto" ]; then
-    PROFILES="$PROFILES --profile crypto --profile web"
-    export DASHBOARD_MODE=crypto
-    DASHBOARD_URL="http://localhost:8502"
-    DASHBOARD_LABEL="Web/FastAPI (port 8502)"
-else
-    PROFILES="$PROFILES --profile stock --profile streamlit"
-    DASHBOARD_URL="http://localhost:8501"
-    DASHBOARD_LABEL="Streamlit (port 8501)"
-fi
+# Build profile flags: consumer + crypto producer + web dashboard
+PROFILES="--profile $CONSUMER --profile crypto --profile web"
+export DASHBOARD_MODE=crypto
 
 # Cleanup function
 cleanup() {
@@ -101,7 +71,7 @@ trap cleanup SIGINT SIGTERM
 # Print banner
 echo -e "${GREEN}"
 echo "=============================================="
-echo "  Local Streaming Pipeline (Containerized)"
+echo "  Production Pipeline (Containerized)"
 case $CONSUMER in
     spark_microbatch)
         echo "  Kafka -> Spark (micro-batch) -> ClickHouse"
@@ -113,12 +83,8 @@ case $CONSUMER in
         echo "  Kafka -> Flink -> ClickHouse"
         ;;
 esac
-echo "  Dashboard: $DASHBOARD_LABEL"
-if [ "$DATA_SOURCE" == "crypto" ]; then
-    echo -e "  Data: ${CYAN}Real-time Crypto (Coinbase)${GREEN}"
-else
-    echo "  Data: Synthetic stocks (demo)"
-fi
+echo -e "  Data: ${CYAN}Real-time Crypto (Coinbase)${GREEN}"
+echo "  Dashboard: Web/FastAPI (port 8502)"
 echo "=============================================="
 echo -e "${NC}"
 

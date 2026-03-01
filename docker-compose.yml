@@ -52,24 +52,9 @@ services:
       retries: 5
 
   # =============================================================================
-  # PRODUCERS
+  # PRODUCER (production - real-time crypto from Coinbase)
   # =============================================================================
 
-  # Synthetic stock data producer (demo)
-  stock-producer:
-    build:
-      context: ./src/demo
-      dockerfile: Dockerfile.producer-demo
-    container_name: stock-producer
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-    profiles:
-      - stock
-
-  # Real-time crypto producer (Coinbase WebSocket)
   crypto-producer:
     build:
       context: ./src/production/producer
@@ -83,7 +68,7 @@ services:
       - crypto
 
   # =============================================================================
-  # CONSUMERS
+  # CONSUMERS (production - writes to ClickHouse)
   # =============================================================================
 
   # Spark micro-batch consumer -> ClickHouse
@@ -149,26 +134,9 @@ services:
       - flink
 
   # =============================================================================
-  # DASHBOARDS
+  # DASHBOARD (production - FastAPI web dashboard)
   # =============================================================================
 
-  # Streamlit dashboard (port 8501) - for synthetic/stock data only
-  streamlit:
-    build:
-      context: ./src/production/dashboard
-    container_name: streamlit
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-    environment:
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "8123"
-    ports:
-      - "8501:8501"
-    profiles:
-      - streamlit
-
-  # FastAPI web dashboard (port 8502) - works with both stock and crypto
   web-dashboard:
     build:
       context: ./src/production/dashboard
@@ -179,30 +147,12 @@ services:
     environment:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: "8123"
-      DASHBOARD_MODE: ${DASHBOARD_MODE:-stock}
+      DASHBOARD_MODE: ${DASHBOARD_MODE:-crypto}
     ports:
       - "8502:8502"
     command: ["python", "web_app.py"]
     profiles:
       - web
-
-  # =============================================================================
-  # DEMO
-  # =============================================================================
-
-  # Demo Spark consumer (console output only, no ClickHouse)
-  spark-demo:
-    build:
-      context: ./src/demo
-      dockerfile: Dockerfile.spark-consumer-demo
-    container_name: spark-demo
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-    profiles:
-      - demo
 
 # =============================================================================
 # VOLUMES
