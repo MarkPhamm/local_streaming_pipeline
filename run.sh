@@ -2,20 +2,25 @@
 
 # =============================================================================
 # Local Streaming Pipeline Runner (Fully Containerized)
-# All components run via docker compose with profiles.
+#
+# Two arguments: CONSUMER and DATA_SOURCE
 #
 # Usage:
-#   ./run.sh                         # Default: synthetic + Spark micro-batch + Streamlit
-#   ./run.sh spark                   # Spark (micro-batch) + Streamlit
-#   ./run.sh spark streaming         # Spark (streaming + windowed aggs) + Streamlit
-#   ./run.sh spark web               # Spark + Web dashboard
-#   ./run.sh flink                   # Flink + Streamlit
-#   ./run.sh flink web               # Flink + Web dashboard
-#   ./run.sh --crypto                # Crypto (forces Web dashboard)
-#   ./run.sh spark streaming --crypto # Spark streaming + crypto + Web
-#   ./run.sh flink --crypto          # Flink + crypto + Web
+#   ./run.sh <consumer> <data_source>
 #
-# Note: --crypto always uses the Web dashboard (Streamlit can't render fast enough)
+#   consumer:    spark_microbatch (default) | spark_streaming | flink
+#   data_source: stock (default)           | crypto
+#
+# Examples:
+#   ./run.sh                              # spark_microbatch + stock
+#   ./run.sh spark_microbatch stock       # same as above
+#   ./run.sh spark_streaming stock        # spark streaming + stock
+#   ./run.sh spark_streaming crypto       # spark streaming + crypto
+#   ./run.sh flink stock                  # flink + stock
+#   ./run.sh flink crypto                 # flink + crypto
+#
+# stock  = demo synthetic producer + Streamlit dashboard (port 8501)
+# crypto = production Coinbase producer + Web dashboard (port 8502)
 # =============================================================================
 
 set -e
@@ -29,78 +34,58 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
-CONSUMER_TYPE="spark"
-SPARK_MODE="microbatch"
-DASHBOARD_TYPE="streamlit"
-DATA_SOURCE="synthetic"
+CONSUMER="${1:-spark_microbatch}"
+DATA_SOURCE="${2:-stock}"
 
-# Parse arguments
-for arg in "$@"; do
-    case $arg in
-        spark)
-            CONSUMER_TYPE="spark"
-            ;;
-        flink)
-            CONSUMER_TYPE="flink"
-            ;;
-        streamlit)
-            DASHBOARD_TYPE="streamlit"
-            ;;
-        web)
-            DASHBOARD_TYPE="web"
-            ;;
-        streaming)
-            SPARK_MODE="streaming"
-            ;;
-        --crypto|crypto)
-            DATA_SOURCE="crypto"
-            ;;
-        --synthetic|synthetic)
-            DATA_SOURCE="synthetic"
-            ;;
-        --help|-h)
-            echo "Usage: ./run.sh [spark|flink] [streaming] [streamlit|web] [--crypto|--synthetic]"
-            echo ""
-            echo "Options:"
-            echo "  spark       Use Spark Structured Streaming (micro-batch, default)"
-            echo "  streaming   Use Spark with windowed aggregations + checkpointing"
-            echo "  flink       Use Flink (true streaming)"
-            echo "  streamlit   Use Streamlit dashboard (port 8501, default)"
-            echo "  web         Use FastAPI web dashboard (port 8502)"
-            echo "  --crypto    Use real-time crypto data (forces web dashboard)"
-            echo "  --synthetic Use synthetic stock data (default)"
-            exit 0
-            ;;
-    esac
-done
+# Validate consumer
+case $CONSUMER in
+    spark_microbatch|spark_streaming|flink)
+        ;;
+    --help|-h)
+        echo "Usage: ./run.sh <consumer> <data_source>"
+        echo ""
+        echo "Consumer (pick one):"
+        echo "  spark_microbatch  Spark micro-batch processing (default)"
+        echo "  spark_streaming   Spark streaming with windowed aggregations"
+        echo "  flink             Flink true streaming"
+        echo ""
+        echo "Data source (pick one):"
+        echo "  stock   Synthetic stock data + Streamlit dashboard (default)"
+        echo "  crypto  Real-time Coinbase crypto + Web dashboard"
+        exit 0
+        ;;
+    *)
+        echo -e "${RED}Error: Unknown consumer '$CONSUMER'${NC}"
+        echo "Valid options: spark_microbatch, spark_streaming, flink"
+        exit 1
+        ;;
+esac
 
-# Build profile flags
-PROFILES=""
+# Validate data source
+case $DATA_SOURCE in
+    stock|crypto)
+        ;;
+    *)
+        echo -e "${RED}Error: Unknown data source '$DATA_SOURCE'${NC}"
+        echo "Valid options: stock, crypto"
+        exit 1
+        ;;
+esac
 
-# Producer profile
+# Build profile flags based on consumer
+PROFILES="--profile $CONSUMER"
+
+# Data source determines producer + dashboard
 if [ "$DATA_SOURCE" == "crypto" ]; then
-    PROFILES="$PROFILES --profile crypto"
+    PROFILES="$PROFILES --profile crypto --profile web"
+    export DASHBOARD_MODE=crypto
+    DASHBOARD_URL="http://localhost:8502"
+    DASHBOARD_LABEL="Web/FastAPI (port 8502)"
 else
-    PROFILES="$PROFILES --profile synthetic"
+    PROFILES="$PROFILES --profile stock --profile streamlit"
+    DASHBOARD_URL="http://localhost:8501"
+    DASHBOARD_LABEL="Streamlit (port 8501)"
 fi
-
-# Consumer profile
-if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
-    PROFILES="$PROFILES --profile spark-streaming"
-elif [ "$CONSUMER_TYPE" == "spark" ]; then
-    PROFILES="$PROFILES --profile spark-microbatch"
-else
-    PROFILES="$PROFILES --profile flink"
-fi
-
-# Crypto forces web dashboard (Streamlit can't render fast enough)
-if [ "$DATA_SOURCE" == "crypto" ] && [ "$DASHBOARD_TYPE" == "streamlit" ]; then
-    echo -e "${YELLOW}Note: Crypto mode uses the Web dashboard (Streamlit can't keep up with real-time data)${NC}"
-    DASHBOARD_TYPE="web"
-fi
-
-# Dashboard profile
-PROFILES="$PROFILES --profile $DASHBOARD_TYPE"
 
 # Cleanup function
 cleanup() {
@@ -117,25 +102,22 @@ trap cleanup SIGINT SIGTERM
 echo -e "${GREEN}"
 echo "=============================================="
 echo "  Local Streaming Pipeline (Containerized)"
-if [ "$CONSUMER_TYPE" == "spark" ] && [ "$SPARK_MODE" == "streaming" ]; then
-    echo "  Kafka -> Spark -> ClickHouse"
-    echo "  (streaming + windowed aggregations)"
-elif [ "$CONSUMER_TYPE" == "spark" ]; then
-    echo "  Kafka -> Spark -> ClickHouse"
-    echo "  (micro-batch processing)"
-else
-    echo "  Kafka -> Flink -> ClickHouse"
-    echo "  (true streaming)"
-fi
-if [ "$DASHBOARD_TYPE" == "streamlit" ]; then
-    echo "  Dashboard: Streamlit (http://localhost:8501)"
-else
-    echo "  Dashboard: Web/FastAPI (http://localhost:8502)"
-fi
+case $CONSUMER in
+    spark_microbatch)
+        echo "  Kafka -> Spark (micro-batch) -> ClickHouse"
+        ;;
+    spark_streaming)
+        echo "  Kafka -> Spark (streaming) -> ClickHouse"
+        ;;
+    flink)
+        echo "  Kafka -> Flink -> ClickHouse"
+        ;;
+esac
+echo "  Dashboard: $DASHBOARD_LABEL"
 if [ "$DATA_SOURCE" == "crypto" ]; then
     echo -e "  Data: ${CYAN}Real-time Crypto (Coinbase)${GREEN}"
 else
-    echo "  Data: Synthetic stocks"
+    echo "  Data: Synthetic stocks (demo)"
 fi
 echo "=============================================="
 echo -e "${NC}"
@@ -190,11 +172,6 @@ docker exec clickhouse clickhouse-client --query "
     ORDER BY (symbol, window_start)
 "
 echo -e "${GREEN}ClickHouse tables ready.${NC}\n"
-
-# Set DASHBOARD_MODE for crypto
-if [ "$DATA_SOURCE" == "crypto" ]; then
-    export DASHBOARD_MODE=crypto
-fi
 
 # Start all profiled services (blocks and streams logs)
 echo -e "${GREEN}=============================================="

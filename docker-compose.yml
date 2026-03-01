@@ -67,7 +67,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     profiles:
-      - synthetic
+      - stock
 
   # Real-time crypto producer (Coinbase WebSocket)
   crypto-producer:
@@ -102,7 +102,7 @@ services:
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: "8123"
     profiles:
-      - spark-microbatch
+      - spark_microbatch
 
   # Spark streaming consumer (windowed aggregations) -> ClickHouse
   spark-streaming:
@@ -128,7 +128,7 @@ services:
       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,com.clickhouse:clickhouse-jdbc:0.6.0,org.apache.httpcomponents.client5:httpclient5:5.3.1
       spark_streaming_clickhouse_consumer.py
     profiles:
-      - spark-streaming
+      - spark_streaming
 
   # Flink consumer -> ClickHouse
   flink-consumer:
