@@ -5,7 +5,8 @@
 </p>
 
 > A fully containerized streaming pipeline for learning real-time data processing with Kafka, Spark/Flink, and ClickHouse.
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/83ec60e1-3b75-4e4c-baf7-4acfa4c9bbd4" />
+<img width="2400" height="1100" alt="pipeline_redo_v3" src="https://github.com/user-attachments/assets/a18d2708-4cf5-4c87-8e54-6e96981f41b0" />
+
 
 ```text
 Producer --> Kafka --> Spark/Flink --> ClickHouse --> Dashboard
